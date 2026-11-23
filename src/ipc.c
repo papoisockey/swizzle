@@ -28,7 +28,7 @@ static struct client *selected(void)
 static bool reload_config(void)
 {
 	struct config next;
-	char *path = srv.conf.path ? strdup(srv.conf.path) : config_default_path();
+	char *path = srv.conf_arg ? strdup(srv.conf_arg) : config_default_path();
 	bool ok = config_load(&next, path);
 	free(path);
 	if (!ok) {
@@ -836,7 +836,7 @@ static bool handle_line(struct ipc_client *ic, char *line)
 static int handle_readable(int fd, uint32_t mask, void *data)
 {
 	struct ipc_client *ic = data;
-	if (ic->dead || (mask & (WL_EVENT_HANGUP | WL_EVENT_ERROR))) {
+	if (ic->dead || (mask & WL_EVENT_ERROR)) {
 		client_free(ic);
 		return 0;
 	}

@@ -379,6 +379,7 @@ struct server {
 	uint32_t last_axis_ms;
 
 	struct config conf;
+	const char *conf_arg;
 	int ipc_fd;
 };
 

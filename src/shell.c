@@ -177,10 +177,7 @@ static void handle_new_layer_surface(struct wl_listener *l, void *data)
 	LISTEN(&s->surface->events.map, &ls->map, handle_layer_map);
 	LISTEN(&s->surface->events.unmap, &ls->unmap, handle_layer_unmap);
 	LISTEN(&s->events.destroy, &ls->destroy, handle_layer_destroy);
-	if (ls->mon)
-		wl_list_insert(&ls->mon->layers[s->pending.layer], &ls->link);
-	else
-		wl_list_init(&ls->link);
+	wl_list_insert(&ls->mon->layers[s->pending.layer], &ls->link);
 }
 
 struct lock_surface {

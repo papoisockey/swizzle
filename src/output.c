@@ -18,7 +18,7 @@ static struct wl_listener layout_change;
 static struct wl_listener mgr_apply, mgr_test, power_set_mode, workspace_commit;
 static struct wlr_output_manager_v1 *output_mgr;
 static struct wlr_ext_workspace_manager_v1 *workspaces;
-static struct wl_event_source *state_idle;
+static struct wl_event_source *state_idle, *lock_retry;
 
 static bool layout_is(struct monitor *m, const char *name);
 static int tag_slot(uint32_t tags);
@@ -215,6 +215,17 @@ out:
 	return ok;
 }
 
+static int handle_lock_retry(void *data)
+{
+	struct monitor *m;
+	if (!srv.lock_pending)
+		return 0;
+	wl_list_for_each(m, &srv.monitors, link)
+		if (m->output->enabled && m->lock_frames < 2)
+			wlr_output_schedule_frame(m->output);
+	return 0;
+}
+
 static void handle_frame(struct wl_listener *l, void *data)
 {
 	struct monitor *m = wl_container_of(l, m, frame);
@@ -224,10 +235,12 @@ static void handle_frame(struct wl_listener *l, void *data)
 		input_apply_grab();
 	effects_frame();
 	bool shown = !wlr_scene_output_needs_frame(m->scene_output) || commit_frame(m);
-	if (srv.lock_pending && shown)
+	if (srv.lock_pending && shown) {
 		lock_frame(m);
-	else if (srv.lock_pending)
+	} else if (srv.lock_pending) {
 		m->lock_frames = 0;
+		wl_event_source_timer_update(lock_retry, 100);
+	}
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	wlr_scene_output_send_frame_done(m->scene_output, &now);
 }
@@ -595,6 +608,8 @@ void output_finish(void)
 	if (state_idle)
 		wl_event_source_remove(state_idle);
 	state_idle = NULL;
+	wl_event_source_remove(lock_retry);
+	lock_retry = NULL;
 }
 
 void output_init(void)
@@ -618,6 +633,7 @@ void output_init(void)
 	LISTEN(&output_mgr->events.test, &mgr_test, handle_mgr_test);
 	LISTEN(&power->events.set_mode, &power_set_mode, handle_power_set_mode);
 	LISTEN(&workspaces->events.commit, &workspace_commit, handle_workspace_commit);
+	lock_retry = wl_event_loop_add_timer(srv.loop, handle_lock_retry, NULL);
 	lease_init();
 }
 

@@ -484,6 +484,7 @@ int main(int argc, char *argv[])
 	redirect_log();
 	wlr_log_init(debug ? WLR_DEBUG : WLR_INFO, NULL);
 
+	srv.conf_arg = conf_path;
 	char *path = conf_path ? strdup(conf_path) : config_default_path();
 	config_load(&srv.conf, path);
 	free(path);
