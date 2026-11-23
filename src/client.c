@@ -652,6 +652,15 @@ static void apply_rules(struct client *c, struct monitor **mon, uint32_t *tags, 
 	}
 }
 
+static bool client_wants_maximized(struct client *c)
+{
+#ifdef XWAYLAND
+	if (c->type != CLIENT_XDG)
+		return c->s.xwl->maximized_vert && c->s.xwl->maximized_horz;
+#endif
+	return c->s.xdg->requested.maximized;
+}
+
 static void create_borders(struct client *c)
 {
 	for (size_t i = 0; i < LENGTH(c->border); i++)
@@ -720,7 +729,7 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 	c->fullscreen = false;
 	if (fs)
 		client_set_fullscreen(c, true);
-	else if (c->type == CLIENT_XDG && c->s.xdg->requested.maximized && !c->scratch)
+	else if (client_wants_maximized(c) && !c->scratch)
 		client_set_maximized(c, true);
 	scratch_fit(c);
 
@@ -964,12 +973,12 @@ static void handle_request_maximize(struct wl_listener *l, void *data)
 	struct client *c = wl_container_of(l, c, request_maximize);
 #ifdef XWAYLAND
 	if (c->type != CLIENT_XDG) {
-		client_set_maximized(c, c->s.xwl->maximized_vert && c->s.xwl->maximized_horz);
+		client_set_maximized(c, client_wants_maximized(c));
 		return;
 	}
 #endif
 	if (c->mapped)
-		client_set_maximized(c, c->s.xdg->requested.maximized);
+		client_set_maximized(c, client_wants_maximized(c));
 	if (c->s.xdg->base->initialized)
 		wlr_xdg_surface_schedule_configure(c->s.xdg->base);
 }
