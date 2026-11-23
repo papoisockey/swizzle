@@ -1,0 +1,11 @@
+build/
+builddir/
+*.o
+*.so
+*.a
+compile_commands.json
+.cache/
+*.orig
+*.rej
+*.swp
+*~

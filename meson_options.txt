@@ -1,0 +1,19 @@
+option('xwayland', type: 'feature', value: 'auto', description: 'XWayland for X11 apps')
+option('layouts', type: 'array',
+  choices: ['dwindle', 'monocle', 'grid', 'scroll', 'float', 'deck', 'center_tile', 'right_tile', 'vertical_tile',
+    'vertical_deck', 'vertical_grid', 'vertical_scroll'],
+  value: ['dwindle', 'monocle', 'grid', 'scroll', 'float', 'deck', 'center_tile', 'right_tile', 'vertical_tile',
+    'vertical_deck', 'vertical_grid', 'vertical_scroll'],
+  description: 'Layouts built next to tile')
+option('overview', type: 'boolean', value: true, description: 'overview of every window and the hot corner')
+option('scratchpad', type: 'boolean', value: true, description: 'scratchpad command and rule')
+option('sticky', type: 'boolean', value: true, description: 'sticky command and rule')
+option('targets', type: 'boolean', value: true, description: 'swizzlectl on <app_id> commands')
+option('tablet', type: 'boolean', value: false, description: 'drawing tablets through tablet-v2')
+option('lid', type: 'boolean', value: true, description: 'lid:close and lid:open bindings')
+option('window_share', type: 'boolean', value: true, description: 'sharing single windows through the portal')
+option('portal', type: 'boolean', value: true, description: 'xdg-foreign, xdg-dialog, d-bus export and the portals.conf')
+option('presentation', type: 'boolean', value: true, description: 'content-type for vrr = content and alpha-modifier')
+option('vr', type: 'boolean', value: false, description: 'drm-lease for vr headsets')
+option('effects', type: 'boolean', value: true, description: 'window shadows and fade and move animations')
+option('scenefx', type: 'feature', value: 'auto', description: 'rounded corners and blur through scenefx, which renders with gles only')

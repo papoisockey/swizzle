@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=swizzle
+Comment=Simple tiling Wayland compositor
+Exec=swizzle
+Type=Application
+DesktopNames=swizzle;wlroots
