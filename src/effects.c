@@ -489,16 +489,28 @@ static void copy_node(struct snapshot *s, struct wlr_scene_node *n, int x, int y
 			copy_node(s, child, x, y);
 	} else if (n->type == WLR_SCENE_NODE_RECT) {
 		struct wlr_scene_rect *r = wlr_scene_rect_from_node(n);
+#ifdef WITH_SCENEFX
 		struct wlr_scene_rect *nr = wlr_scene_rect_create(s->tree, r->width, r->height, r->color);
 		if (!nr)
 			return;
 		wlr_scene_node_set_position(&nr->node, x, y);
-#ifdef WITH_SCENEFX
 		nr->accepts_input = false;
 		wlr_scene_rect_set_corner_radii(nr, r->corners);
 		wlr_scene_rect_set_clipped_region(nr, r->clipped_region);
-#endif
 		add_node(s, &nr->node, x, y, r->width, r->height, r->color);
+#else
+		if (r->width <= 0 || r->height <= 0)
+			return;
+		struct wlr_buffer *buf = solid(r->color);
+		struct wlr_scene_buffer *nb = buf ? drawn_buffer(s->tree, buf) : NULL;
+		if (buf)
+			wlr_buffer_drop(buf);
+		if (!nb)
+			return;
+		wlr_scene_node_set_position(&nb->node, x, y);
+		wlr_scene_buffer_set_dest_size(nb, r->width, r->height);
+		add_node(s, &nb->node, x, y, r->width, r->height, NULL);
+#endif
 #ifdef WITH_SCENEFX
 	} else if (n->type == WLR_SCENE_NODE_SHADOW) {
 		struct wlr_scene_shadow *sh = wlr_scene_shadow_from_node(n);

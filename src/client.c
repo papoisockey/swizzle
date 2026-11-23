@@ -536,6 +536,7 @@ void client_set_maximized(struct client *c, bool on)
 	if (c->ftl)
 		wlr_foreign_toplevel_handle_v1_set_maximized(c->ftl, on);
 	client_set_border_color(c, client_border_color(c));
+	effects_resize(c);
 	arrange(c->mon);
 }
 
@@ -561,6 +562,7 @@ void client_set_overlay(struct client *c, bool on)
 	c->overlay = on;
 	client_restack(c);
 	client_set_border_color(c, client_border_color(c));
+	effects_resize(c);
 	arrange(c->mon);
 }
 
@@ -692,7 +694,7 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 	bool rule_focus;
 	int bw = srv.conf.border_width + srv.conf.border_outer_width;
 
-	c->minimized = c->maximized = c->overlay = c->fake_fullscreen = c->scroll_stacked = false;
+	c->minimized = c->maximized = c->overlay = c->fake_fullscreen = c->scroll_stacked = c->urgent = false;
 	c->split = 0;
 	c->in_overview = false;
 	apply_rules(c, &m, &tags, &rule_focus);

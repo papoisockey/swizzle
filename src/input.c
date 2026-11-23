@@ -623,11 +623,12 @@ void input_start_grab(struct client *c, uint32_t edges)
 	bool to_tile = !c->floating && !edges && srv.conf.drag_tile_to_tile && !c->maximized && !c->scratch &&
 		!layout_floats(c->mon);
 	if (!to_tile && (c->maximized || !c->floating)) {
-		c->prev = c->geom;
 		if (c->maximized)
 			client_set_maximized(c, false);
-		if (!c->floating)
+		if (!c->floating) {
+			c->prev = c->geom;
 			client_set_floating(c, true);
+		}
 	}
 	struct wlr_seat_pointer_state *p = &srv.seat->pointer_state;
 	grab_button = p->button_count ? p->buttons[p->button_count - 1].button : 0;
@@ -1238,6 +1239,8 @@ void input_finish(void)
 		wl_list_remove(&listeners[i]->link);
 	wl_event_source_remove(repeat_timer);
 	tablet_finish();
+	wlr_keyboard_group_destroy(srv.kb_group);
+	srv.kb_group = NULL;
 }
 
 void input_init(void)

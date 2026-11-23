@@ -775,7 +775,7 @@ static size_t format_state(char *out, size_t cap)
 
 static void send_status(struct ipc_client *ic)
 {
-	char line[1024];
+	char line[2048];
 	struct monitor *m;
 	struct client *c, *sel = client_focused();
 	wl_list_for_each(m, &srv.monitors, link) {

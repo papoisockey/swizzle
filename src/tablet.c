@@ -29,7 +29,7 @@ static bool tool_motion(struct wlr_tablet *tablet, struct wlr_tablet_tool *tool,
 	if (!surf) {
 		wlr_send_tablet_v2_tablet_tool_proximity_out(t);
 		input_motion(time, false);
-		return true;
+		return false;
 	}
 	if (t->focused_surface != surf)
 		wlr_send_tablet_v2_tablet_tool_proximity_in(t, tablet->data, surf);

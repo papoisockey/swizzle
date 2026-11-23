@@ -19,6 +19,7 @@ static struct wl_listener mgr_apply, mgr_test, power_set_mode, workspace_commit;
 static struct wlr_output_manager_v1 *output_mgr;
 static struct wlr_ext_workspace_manager_v1 *workspaces;
 static struct wl_event_source *state_idle, *lock_retry;
+static bool finishing;
 
 static bool layout_is(struct monitor *m, const char *name);
 static int tag_slot(uint32_t tags);
@@ -218,10 +219,8 @@ out:
 static int handle_lock_retry(void *data)
 {
 	struct monitor *m;
-	if (!srv.lock_pending)
-		return 0;
 	wl_list_for_each(m, &srv.monitors, link)
-		if (m->output->enabled && m->lock_frames < 2)
+		if (m->output->enabled && (!srv.lock_pending || m->lock_frames < 2))
 			wlr_output_schedule_frame(m->output);
 	return 0;
 }
@@ -237,8 +236,9 @@ static void handle_frame(struct wl_listener *l, void *data)
 	bool shown = !wlr_scene_output_needs_frame(m->scene_output) || commit_frame(m);
 	if (srv.lock_pending && shown) {
 		lock_frame(m);
-	} else if (srv.lock_pending) {
-		m->lock_frames = 0;
+	} else if (!shown) {
+		if (srv.lock_pending)
+			m->lock_frames = 0;
 		wl_event_source_timer_update(lock_retry, 100);
 	}
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -623,6 +623,7 @@ void output_finish(void)
 	wl_list_remove(&power_set_mode.link);
 	wl_list_remove(&workspace_commit.link);
 	lease_finish();
+	finishing = true;
 	if (state_idle)
 		wl_event_source_remove(state_idle);
 	state_idle = NULL;
@@ -1212,7 +1213,7 @@ static void state_flush(void *data)
 
 void state_changed(void)
 {
-	if (!state_idle)
+	if (!state_idle && !finishing)
 		state_idle = wl_event_loop_add_idle(srv.loop, state_flush, NULL);
 }
 
