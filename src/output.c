@@ -531,6 +531,15 @@ static void apply_output_config(struct wlr_output_configuration_v1 *cfg, bool te
 				(m->output->adaptive_sync_status == WLR_OUTPUT_ADAPTIVE_SYNC_ENABLED);
 	}
 	struct wlr_backend_output_state *states = wlr_output_configuration_v1_build_state(cfg, &n);
+	size_t kept = 0;
+	for (size_t i = 0; states && i < n; i++) {
+		struct monitor *m = states[i].output->data;
+		if (m && m->asleep && states[i].base.enabled)
+			wlr_output_state_finish(&states[i].base);
+		else
+			states[kept++] = states[i];
+	}
+	n = kept;
 	bool ok = states && (test ? wlr_backend_test(srv.backend, states, n) : wlr_backend_commit(srv.backend, states, n));
 	for (size_t i = 0; states && i < n; i++)
 		wlr_output_state_finish(&states[i].base);
@@ -540,7 +549,7 @@ static void apply_output_config(struct wlr_output_configuration_v1 *cfg, bool te
 		struct monitor *m = h->state.output->data;
 		if (!ok || test || !m)
 			continue;
-		m->asleep = false;
+		m->asleep = m->asleep && h->state.enabled;
 		if (m->vrr_toggled)
 			m->oc.vrr = h->state.adaptive_sync_enabled ? VRR_ON : VRR_OFF;
 		m->oc.enabled = h->state.enabled;
@@ -587,10 +596,19 @@ static void handle_power_set_mode(struct wl_listener *l, void *data)
 	if (!m || monitor_off(m))
 		return;
 	wlr_output_state_init(&st);
+	if (on)
+		build_state(m, &st, !m->vrr_failed);
 	wlr_output_state_set_enabled(&st, on);
-	if (wlr_output_commit_state(m->output, &st))
-		m->asleep = !on;
+	bool ok = wlr_output_commit_state(m->output, &st);
 	wlr_output_state_finish(&st);
+	if (!ok && on) {
+		wlr_output_state_init(&st);
+		wlr_output_state_set_enabled(&st, true);
+		ok = wlr_output_commit_state(m->output, &st);
+		wlr_output_state_finish(&st);
+	}
+	if (ok)
+		m->asleep = !on;
 	if (on)
 		layer_arrange(m);
 	lock_arrange();

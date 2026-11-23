@@ -1176,7 +1176,10 @@ static void handle_x11_minimize(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, minimize);
 	struct wlr_xwayland_minimize_event *ev = data;
-	wlr_xwayland_surface_set_minimized(c->s.xwl, ev->minimize && !client_visible(c));
+	if (c->mapped && c->type == CLIENT_X11 && (client_visible(c) || c->minimized))
+		client_set_minimized(c, ev->minimize);
+	else
+		wlr_xwayland_surface_set_minimized(c->s.xwl, ev->minimize && !client_visible(c));
 }
 
 static void handle_x11_activate(struct wl_listener *l, void *data)

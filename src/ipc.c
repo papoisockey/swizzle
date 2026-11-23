@@ -527,10 +527,7 @@ static bool a_mfact(const char *arg, char *err, size_t len)
 	}
 	if (!srv.selmon)
 		return true;
-	float f = srv.selmon->mfact + step;
-	if (!(f >= 0.05f - 1e-4f && f <= 0.95f + 1e-4f))
-		return true;
-	srv.selmon->mfact = MAX(0.05f, MIN(0.95f, f));
+	srv.selmon->mfact = MAX(0.05f, MIN(0.95f, srv.selmon->mfact + step));
 	arrange(srv.selmon);
 	return true;
 }

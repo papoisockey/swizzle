@@ -55,7 +55,7 @@ struct constraint {
 	struct wl_listener destroy;
 };
 
-static struct wl_list keyboards;
+static struct wl_list keyboards, vpointers;
 static struct wl_listener new_input, kb_key, kb_modifiers;
 static struct wl_listener cursor_motion, cursor_motion_abs, cursor_button, cursor_axis, cursor_frame;
 static struct wl_listener swipe_begin, swipe_update, swipe_end;
@@ -77,6 +77,7 @@ static struct wl_event_source *repeat_timer;
 static uint32_t repeat_mods;
 static xkb_keysym_t repeat_sym;
 static uint32_t swallowed[8];
+static uint32_t grab_button;
 
 static struct xkb_keymap *build_keymap(void)
 {
@@ -462,8 +463,20 @@ static void handle_new_vpointer(struct wl_listener *l, void *data)
 	struct wlr_virtual_pointer_v1_new_pointer_event *ev = data;
 	struct wlr_input_device *dev = &ev->new_pointer->pointer.base;
 	wlr_cursor_attach_input_device(srv.cursor, dev);
+	track_device(&vpointers, dev);
 	if (ev->suggested_output)
 		wlr_cursor_map_input_to_output(srv.cursor, dev, ev->suggested_output);
+}
+
+static bool locked_virtual(struct wlr_pointer *p)
+{
+	struct device *d;
+	if (!srv.locked)
+		return false;
+	wl_list_for_each(d, &vpointers, link)
+		if (d->dev == &p->base)
+			return true;
+	return false;
 }
 
 void input_update_idle(struct wlr_idle_inhibitor_v1 *gone)
@@ -616,6 +629,8 @@ void input_start_grab(struct client *c, uint32_t edges)
 		if (!c->floating)
 			client_set_floating(c, true);
 	}
+	struct wlr_seat_pointer_state *p = &srv.seat->pointer_state;
+	grab_button = p->button_count ? p->buttons[p->button_count - 1].button : 0;
 	srv.grab_c = c;
 	srv.grab_geo = c->geom;
 	srv.grab_x = srv.cursor->x;
@@ -804,6 +819,8 @@ static void locked_end_grabs(void)
 static void handle_motion(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_motion_event *ev = data;
+	if (locked_virtual(ev->pointer))
+		return;
 	locked_end_grabs();
 	wlr_relative_pointer_manager_v1_send_relative_motion(srv.relative_pointer, srv.seat,
 		(uint64_t)ev->time_msec * 1000, ev->delta_x, ev->delta_y, ev->unaccel_dx, ev->unaccel_dy);
@@ -818,6 +835,8 @@ static void handle_motion_abs(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_motion_absolute_event *ev = data;
 	double lx, ly;
+	if (locked_virtual(ev->pointer))
+		return;
 	locked_end_grabs();
 	wlr_cursor_absolute_to_layout_coords(srv.cursor, &ev->pointer->base, ev->x, ev->y, &lx, &ly);
 	double dx = lx - srv.cursor->x, dy = ly - srv.cursor->y;
@@ -883,9 +902,11 @@ static void handle_button(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_button_event *ev = data;
 
+	if (ev->state == WL_POINTER_BUTTON_STATE_PRESSED && locked_virtual(ev->pointer))
+		return;
 	locked_end_grabs();
 	if (srv.cursor_mode != CURSOR_NORMAL) {
-		if (ev->state != WL_POINTER_BUTTON_STATE_RELEASED)
+		if (ev->state != WL_POINTER_BUTTON_STATE_RELEASED || (grab_button && ev->button != grab_button))
 			return;
 		end_grab();
 		for (size_t i = 0; i < srv.seat->pointer_state.button_count; i++)
@@ -932,8 +953,10 @@ static void handle_button(struct wl_listener *l, void *data)
 
 		if (mods == srv.conf.mouse_mod && (ev->button == BTN_LEFT || ev->button == BTN_RIGHT)) {
 			input_start_grab(c, ev->button == BTN_LEFT ? 0 : WLR_EDGE_BOTTOM | WLR_EDGE_RIGHT);
-			if (srv.cursor_mode != CURSOR_NORMAL)
+			if (srv.cursor_mode != CURSOR_NORMAL) {
+				grab_button = ev->button;
 				return;
+			}
 		}
 	}
 	wlr_seat_pointer_notify_button(srv.seat, ev->time_msec, ev->button, ev->state);
@@ -943,6 +966,8 @@ static void handle_axis(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_axis_event *ev = data;
 	bool repeat;
+	if (locked_virtual(ev->pointer))
+		return;
 	locked_end_grabs();
 	uint32_t mods = binding_mods(wlr_seat_get_keyboard(srv.seat));
 	if (ev->delta != 0) {
@@ -1218,6 +1243,7 @@ void input_finish(void)
 void input_init(void)
 {
 	wl_list_init(&keyboards);
+	wl_list_init(&vpointers);
 	wl_list_init(&touches);
 	wl_list_init(&srv.pointers);
 	wl_list_init(&drag_destroy.link);
