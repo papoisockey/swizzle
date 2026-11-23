@@ -687,6 +687,8 @@ bool action_run(const char *cmd, char *err, size_t errlen)
 #endif
 
 #define IPC_BUF 4096
+#define IPC_MAX_CLIENTS 64
+#define IPC_WAIT_MS 20
 
 struct ipc_client {
 	struct wl_list link;
@@ -702,12 +704,13 @@ static struct sockaddr_un addr;
 static struct wl_event_source *listen_src;
 static struct wl_list ipc_clients;
 static char last_state[IPC_BUF];
-static int nsubscribers;
+static int nsubscribers, nclients;
 
 static void client_free(struct ipc_client *c)
 {
 	if (c->subscribed)
 		nsubscribers--;
+	nclients--;
 	wl_event_source_remove(c->src);
 	close(c->fd);
 	wl_list_remove(&c->link);
@@ -724,7 +727,7 @@ static bool client_write(struct ipc_client *c, const char *s, size_t n)
 			continue;
 		if (w < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) && !c->subscribed) {
 			struct pollfd p = {.fd = c->fd, .events = POLLOUT};
-			if (poll(&p, 1, 100) > 0 && (p.revents & POLLOUT))
+			if (poll(&p, 1, IPC_WAIT_MS) > 0 && (p.revents & POLLOUT))
 				continue;
 		}
 		if (w <= 0) {
@@ -884,6 +887,11 @@ static void accept_one(int cfd)
 		close(cfd);
 		return;
 	}
+	if (nclients >= IPC_MAX_CLIENTS) {
+		wlr_log(WLR_ERROR, "ipc: too many connections, rejecting one");
+		close(cfd);
+		return;
+	}
 	fcntl(cfd, F_SETFD, FD_CLOEXEC);
 	fcntl(cfd, F_SETFL, O_NONBLOCK);
 	struct ipc_client *ic = calloc(1, sizeof(*ic));
@@ -898,6 +906,7 @@ static void accept_one(int cfd)
 		free(ic);
 		return;
 	}
+	nclients++;
 	wl_list_insert(&ipc_clients, &ic->link);
 }
 
@@ -925,7 +934,11 @@ bool ipc_init(void)
 		wlr_log(WLR_ERROR, "XDG_RUNTIME_DIR %s is not private, other users may see swizzle sockets", dir);
 
 	addr.sun_family = AF_UNIX;
-	snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/swizzle.%s.sock", dir, wd);
+	int plen = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/swizzle.%s.sock", dir, wd);
+	if (plen < 0 || (size_t)plen >= sizeof(addr.sun_path)) {
+		wlr_log(WLR_ERROR, "ipc: socket path in %s is too long", dir);
+		return false;
+	}
 	unlink(addr.sun_path);
 
 	srv.ipc_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -998,6 +1011,15 @@ void ipc_client_event(const char *ev, struct client *c)
 	field(app, sizeof(app), client_app_id(c));
 	field(title, sizeof(title), client_title(c));
 	ipc_event("%s %s\t%s", ev, app, title);
+}
+
+void ipc_title_event(struct client *c)
+{
+	char title[512];
+	if (!nsubscribers)
+		return;
+	field(title, sizeof(title), client_title(c));
+	ipc_event("title %s", title);
 }
 
 void ipc_notify_state(void)

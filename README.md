@@ -54,7 +54,7 @@ locked+XF86AudioMute=spawn wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
 | `[rule]` | `app_id`, `title`, then `floating`, `fullscreen`, `sticky`, `scratchpad`, `focus`, `tags`, `output` |
 | `[layer]` | `namespace`, then `animations`, `blur`, `shadow`, `animation_open`, `animation_close` |
 | `[autostart]` `[env]` | `exec=CMD`, `NAME=VALUE` |
-| `[bind]` | `MODS+KEY=COMMAND`, KEY is an xkb name, `wheel_up`, `button_middle`, `swipe:3:left`, `lid:close` |
+| `[bind]` | `MODS+KEY=COMMAND`, KEY is an xkb name, `wheel_up`, `button_middle`, `swipe:3:left`, `lid:close`; a `locked+` prefix keeps it working behind the lock screen, `locked+lid:close` included |
 
 Layouts: tile, right_tile, vertical_tile, center_tile, deck, vertical_deck, dwindle, monocle, grid, vertical_grid, scroll, vertical_scroll, float.
 

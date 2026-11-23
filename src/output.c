@@ -168,11 +168,12 @@ layout:
 	layout_add(m, oc->has_pos, oc->x, oc->y);
 }
 
-static void commit_frame(struct monitor *m)
+static bool commit_frame(struct monitor *m)
 {
 	const struct output_conf *oc = &m->oc;
 	struct client *fs = m->fullscreen;
 	struct wlr_output_state st;
+	bool ok = false;
 
 	wlr_output_state_init(&st);
 	if (!wlr_scene_output_build_state(m->scene_output, &st, NULL))
@@ -190,7 +191,7 @@ static void commit_frame(struct monitor *m)
 	if (st.committed & WLR_OUTPUT_STATE_ADAPTIVE_SYNC_ENABLED)
 		wlr_log(WLR_INFO, "%s: vrr %s", m->output->name, want_vrr ? "on" : "off");
 
-	bool ok = wlr_output_commit_state(m->output, &st);
+	ok = wlr_output_commit_state(m->output, &st);
 	if (!ok && st.tearing_page_flip) {
 		wlr_log(WLR_INFO, "%s: tearing page flip rejected", m->output->name);
 		st.tearing_page_flip = false;
@@ -207,10 +208,11 @@ static void commit_frame(struct monitor *m)
 		wlr_log(WLR_INFO, "%s: vrr rejected, disabling", m->output->name);
 		st.committed &= ~WLR_OUTPUT_STATE_ADAPTIVE_SYNC_ENABLED;
 		m->vrr_failed = true;
-		wlr_output_commit_state(m->output, &st);
+		ok = wlr_output_commit_state(m->output, &st);
 	}
 out:
 	wlr_output_state_finish(&st);
+	return ok;
 }
 
 static void handle_frame(struct wl_listener *l, void *data)
@@ -221,10 +223,15 @@ static void handle_frame(struct wl_listener *l, void *data)
 	if (srv.grab_c && srv.grab_c->mon == m)
 		input_apply_grab();
 	effects_frame();
-	if (wlr_scene_output_needs_frame(m->scene_output))
-		commit_frame(m);
-	if (srv.lock_pending)
-		lock_frame(m);
+	bool shown = !wlr_scene_output_needs_frame(m->scene_output) || commit_frame(m);
+	if (srv.lock_pending) {
+		if (shown) {
+			lock_frame(m);
+		} else {
+			m->lock_frames = 0;
+			wlr_output_schedule_frame(m->output);
+		}
+	}
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	wlr_scene_output_send_frame_done(m->scene_output, &now);
 }

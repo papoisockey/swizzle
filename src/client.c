@@ -977,7 +977,7 @@ static void handle_set_title(struct wl_listener *l, void *data)
 	struct client *c = wl_container_of(l, c, set_title);
 	ftl_update(c);
 	if (c == client_focused())
-		ipc_event("title %s", client_title(c));
+		ipc_title_event(c);
 }
 
 static void handle_set_app_id(struct wl_listener *l, void *data)

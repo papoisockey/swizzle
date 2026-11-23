@@ -9,15 +9,20 @@ static int connect_socket(void)
 {
 	struct sockaddr_un addr = {.sun_family = AF_UNIX};
 	const char *path = getenv("SWIZZLE_SOCKET");
+	int len;
 	if (path) {
-		snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path);
+		len = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path);
 	} else {
 		const char *dir = getenv("XDG_RUNTIME_DIR"), *wd = getenv("WAYLAND_DISPLAY");
 		if (!dir || !wd) {
 			fprintf(stderr, "swizzlectl: SWIZZLE_SOCKET or XDG_RUNTIME_DIR+WAYLAND_DISPLAY required\n");
 			return -1;
 		}
-		snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/swizzle.%s.sock", dir, wd);
+		len = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/swizzle.%s.sock", dir, wd);
+	}
+	if (len < 0 || (size_t)len >= sizeof(addr.sun_path)) {
+		fprintf(stderr, "swizzlectl: socket path too long\n");
+		return -1;
 	}
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0 || connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
@@ -40,6 +45,11 @@ int main(int argc, char *argv[])
 			"  on <app_id> close|floating|fullscreen|activate|sticky|width <w>|scratchpad move|tag <n>|toggletag <n>|tagmon prev|next\n");
 		return argc < 2;
 	}
+	for (int i = 1; i < argc; i++)
+		if (strpbrk(argv[i], "\n\r")) {
+			fprintf(stderr, "swizzlectl: arguments must not contain newlines\n");
+			return 1;
+		}
 	int fd = connect_socket();
 	if (fd < 0)
 		return 1;

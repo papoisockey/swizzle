@@ -147,14 +147,15 @@ static void handle_layer_destroy(struct wl_listener *l, void *data)
 static void handle_new_layer_surface(struct wl_listener *l, void *data)
 {
 	struct wlr_layer_surface_v1 *s = data;
+	struct monitor *m = s->output ? s->output->data : NULL;
 
-	if (!s->output) {
-		if (!srv.selmon) {
-			wlr_layer_surface_v1_destroy(s);
-			return;
-		}
-		s->output = srv.selmon->output;
+	if (!m || (!m->output->enabled && !m->asleep))
+		m = srv.selmon;
+	if (!m) {
+		wlr_layer_surface_v1_destroy(s);
+		return;
 	}
+	s->output = m->output;
 	struct layer_surface *ls = calloc(1, sizeof(*ls));
 	if (!ls) {
 		wlr_layer_surface_v1_destroy(s);
@@ -162,7 +163,7 @@ static void handle_new_layer_surface(struct wl_listener *l, void *data)
 	}
 	ls->type = CLIENT_LAYER;
 	ls->ls = s;
-	ls->mon = s->output->data ? s->output->data : srv.selmon;
+	ls->mon = m;
 	s->data = ls;
 	ls->scene_ls = wlr_scene_layer_surface_v1_create(srv.layers[layermap[s->pending.layer]], s);
 	ls->scene = ls->scene_ls->tree;
@@ -448,7 +449,7 @@ static void handle_new_text_input(struct wl_listener *l, void *data)
 	LISTEN(&ti->events.commit, &t->commit, handle_ti_commit);
 	LISTEN(&ti->events.disable, &t->disable, handle_ti_disable);
 	LISTEN(&ti->events.destroy, &t->destroy, handle_ti_destroy);
-	if (focused && wl_resource_get_client(ti->resource) == wl_resource_get_client(focused->resource))
+	if (focused && !srv.locked && wl_resource_get_client(ti->resource) == wl_resource_get_client(focused->resource))
 		wlr_text_input_v3_send_enter(ti, focused);
 }
 
@@ -464,7 +465,7 @@ void ime_focus(struct wlr_surface *surface)
 				deactivate();
 			wlr_text_input_v3_send_leave(ti);
 		}
-		if (surface && wl_resource_get_client(ti->resource) == wl_resource_get_client(surface->resource))
+		if (surface && !srv.locked && wl_resource_get_client(ti->resource) == wl_resource_get_client(surface->resource))
 			wlr_text_input_v3_send_enter(ti, surface);
 	}
 }
@@ -502,7 +503,7 @@ bool ime_modifiers(struct wlr_keyboard *kb)
 static void handle_im_commit(struct wl_listener *l, void *data)
 {
 	struct wlr_text_input_v3 *ti = focused_ti();
-	if (!ti)
+	if (!ti || srv.locked)
 		return;
 	if (im->current.preedit.text)
 		wlr_text_input_v3_send_preedit_string(ti, im->current.preedit.text,

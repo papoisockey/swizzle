@@ -369,10 +369,11 @@ static void keyboard_key(struct wlr_keyboard *kb, struct wlr_keyboard_key_event 
 
 	if (ev->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		const xkb_keysym_t *syms;
+		bool physical = !wlr_input_device_get_virtual_keyboard(&kb->base);
 		int n = xkb_state_key_get_syms(kb->xkb_state, keycode, &syms);
 		for (int i = 0; i < n; i++)
 			if (syms[i] >= XKB_KEY_XF86Switch_VT_1 && syms[i] <= XKB_KEY_XF86Switch_VT_12) {
-				if (srv.session)
+				if (srv.session && physical)
 					wlr_session_change_vt(srv.session, syms[i] - XKB_KEY_XF86Switch_VT_1 + 1);
 				handled = true;
 			}
@@ -422,12 +423,16 @@ static void handle_modifiers(struct wl_listener *l, void *data)
 static void handle_vkeyboard_key(struct wl_listener *l, void *data)
 {
 	struct vkeyboard *v = wl_container_of(l, v, key);
+	if (srv.locked)
+		return;
 	keyboard_key(v->kb, data);
 }
 
 static void handle_vkeyboard_modifiers(struct wl_listener *l, void *data)
 {
 	struct vkeyboard *v = wl_container_of(l, v, modifiers);
+	if (srv.locked)
+		return;
 	keyboard_modifiers(v->kb);
 }
 
@@ -786,9 +791,20 @@ static bool constrain(double *dx, double *dy)
 	return true;
 }
 
+static void locked_end_grabs(void)
+{
+	if (!srv.locked)
+		return;
+	if (srv.seat->pointer_state.grab != srv.seat->pointer_state.default_grab)
+		wlr_seat_pointer_end_grab(srv.seat);
+	if (srv.seat->touch_state.grab != srv.seat->touch_state.default_grab)
+		wlr_seat_touch_end_grab(srv.seat);
+}
+
 static void handle_motion(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_motion_event *ev = data;
+	locked_end_grabs();
 	wlr_relative_pointer_manager_v1_send_relative_motion(srv.relative_pointer, srv.seat,
 		(uint64_t)ev->time_msec * 1000, ev->delta_x, ev->delta_y, ev->unaccel_dx, ev->unaccel_dy);
 	double dx = ev->delta_x, dy = ev->delta_y;
@@ -802,6 +818,7 @@ static void handle_motion_abs(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_motion_absolute_event *ev = data;
 	double lx, ly;
+	locked_end_grabs();
 	wlr_cursor_absolute_to_layout_coords(srv.cursor, &ev->pointer->base, ev->x, ev->y, &lx, &ly);
 	double dx = lx - srv.cursor->x, dy = ly - srv.cursor->y;
 	wlr_relative_pointer_manager_v1_send_relative_motion(srv.relative_pointer, srv.seat,
@@ -866,6 +883,7 @@ static void handle_button(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_button_event *ev = data;
 
+	locked_end_grabs();
 	if (srv.cursor_mode != CURSOR_NORMAL) {
 		if (ev->state != WL_POINTER_BUTTON_STATE_RELEASED)
 			return;
@@ -925,6 +943,7 @@ static void handle_axis(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_axis_event *ev = data;
 	bool repeat;
+	locked_end_grabs();
 	uint32_t mods = binding_mods(wlr_seat_get_keyboard(srv.seat));
 	if (ev->delta != 0) {
 		bool vert = ev->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL;
@@ -960,6 +979,7 @@ static void handle_touch_down(struct wl_listener *l, void *data)
 	struct wlr_touch_down_event *ev = data;
 	struct wlr_surface *surf;
 	double lx, ly, sx, sy;
+	locked_end_grabs();
 	wlr_cursor_absolute_to_layout_coords(srv.cursor, &ev->touch->base, ev->x, ev->y, &lx, &ly);
 	struct client *c = client_at(lx, ly, &surf, &sx, &sy);
 	input_click_focus(c, surf);

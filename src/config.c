@@ -269,18 +269,19 @@ static void add_bind(struct config *c, const char *key, const char *cmd, int lin
 {
 	uint32_t mods;
 	xkb_keysym_t sym;
+	bool locked = !strncmp(key, "locked+", 7);
+	if (locked)
+		key += 7;
 #ifdef WITH_LID
-	char **lid = !strcmp(key, "lid:close") ? &c->lid_close : !strcmp(key, "lid:open") ? &c->lid_open : NULL;
-	if (lid) {
-		set_str(lid, cmd);
+	bool lid_close = !strcmp(key, "lid:close");
+	if (lid_close || !strcmp(key, "lid:open")) {
+		set_str(lid_close ? &c->lid_close : &c->lid_open, cmd);
+		*(lid_close ? &c->lid_close_locked : &c->lid_open_locked) = locked;
 		if (!action_known(cmd))
 			conf_error("config:%d: unknown command in '%s'", line, cmd);
 		return;
 	}
 #endif
-	bool locked = !strncmp(key, "locked+", 7);
-	if (locked)
-		key += 7;
 	if (!config_parse_bind_key(key, &mods, &sym)) {
 		conf_error("config:%d: invalid key '%s'", line, key);
 		return;
@@ -718,7 +719,9 @@ static void parse_output(struct output_conf *o, const char *k, const char *v, in
 			o->refresh = 0;
 		}
 	} else if (!strcmp(k, "scale")) {
-		SET_NUM(o->scale, v, 0.0, 10.0);
+		double s;
+		if (parse_num(v, 0.0, 10.0, &s))
+			o->scale = s > 0 && s < 0.25 ? 0.25f : (float)s;
 	} else if (!strcmp(k, "position")) {
 		int n = 0;
 		o->has_pos = sscanf(v, "%d,%d%n", &o->x, &o->y, &n) == 2 && !v[n] && o->x > -1000000 && o->x < 1000000 &&
@@ -1113,16 +1116,44 @@ void config_output(const char *name, struct output_conf *out)
 	out->name = NULL;
 }
 
+static struct env_var *orig_env;
+static size_t norig_env;
+
+static struct env_var *orig_of(const char *key)
+{
+	for (size_t i = 0; i < norig_env; i++)
+		if (!strcmp(orig_env[i].key, key))
+			return &orig_env[i];
+	return NULL;
+}
+
+static void remember_env(const char *key)
+{
+	if (orig_of(key))
+		return;
+	const char *v = getenv(key);
+	orig_env = grow(orig_env, &norig_env, sizeof(*orig_env));
+	orig_env[norig_env - 1].key = strdup(key);
+	orig_env[norig_env - 1].value = v ? strdup(v) : NULL;
+}
+
 void config_apply_env(const struct config *old, const struct config *conf)
 {
 	for (size_t i = 0; old && i < old->nenv; i++) {
 		bool kept = false;
 		for (size_t j = 0; j < conf->nenv && !kept; j++)
 			kept = !strcmp(old->env[i].key, conf->env[j].key);
-		if (!kept)
+		if (kept)
+			continue;
+		const struct env_var *o = orig_of(old->env[i].key);
+		if (o && o->value)
+			setenv(o->key, o->value, 1);
+		else
 			unsetenv(old->env[i].key);
 	}
-	for (size_t i = 0; i < conf->nenv; i++)
+	for (size_t i = 0; i < conf->nenv; i++) {
+		remember_env(conf->env[i].key);
 		if (setenv(conf->env[i].key, conf->env[i].value, 1) < 0)
 			wlr_log_errno(WLR_ERROR, "setenv %s", conf->env[i].key);
+	}
 }

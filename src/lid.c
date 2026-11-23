@@ -10,8 +10,12 @@ struct lid {
 static void handle_lid_toggle(struct wl_listener *l, void *data)
 {
 	struct wlr_switch_toggle_event *ev = data;
-	if (ev->switch_type == WLR_SWITCH_TYPE_LID)
-		action_exec(ev->switch_state == WLR_SWITCH_STATE_ON ? srv.conf.lid_close : srv.conf.lid_open);
+	bool lid_close = ev->switch_state == WLR_SWITCH_STATE_ON;
+	if (ev->switch_type != WLR_SWITCH_TYPE_LID)
+		return;
+	if (srv.locked && !(lid_close ? srv.conf.lid_close_locked : srv.conf.lid_open_locked))
+		return;
+	action_exec(lid_close ? srv.conf.lid_close : srv.conf.lid_open);
 }
 
 static void handle_lid_destroy(struct wl_listener *l, void *data)

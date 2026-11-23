@@ -121,6 +121,7 @@ struct config {
 	bool tag_back_and_forth;
 	char *tag_names[TAGCOUNT];
 	char *lid_close, *lid_open;
+	bool lid_close_locked, lid_open_locked;
 	int gap_ih, gap_iv, gap_oh, gap_ov;
 	bool smart_gaps;
 	int border_width;
@@ -500,6 +501,7 @@ void ipc_finish(void);
 void ipc_event(const char *fmt, ...);
 void ipc_notify_state(void);
 void ipc_client_event(const char *ev, struct client *c);
+void ipc_title_event(struct client *c);
 
 struct wlr_input_device;
 #ifdef WITH_TABLET
