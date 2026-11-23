@@ -224,14 +224,10 @@ static void handle_frame(struct wl_listener *l, void *data)
 		input_apply_grab();
 	effects_frame();
 	bool shown = !wlr_scene_output_needs_frame(m->scene_output) || commit_frame(m);
-	if (srv.lock_pending) {
-		if (shown) {
-			lock_frame(m);
-		} else {
-			m->lock_frames = 0;
-			wlr_output_schedule_frame(m->output);
-		}
-	}
+	if (srv.lock_pending && shown)
+		lock_frame(m);
+	else if (srv.lock_pending)
+		m->lock_frames = 0;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	wlr_scene_output_send_frame_done(m->scene_output, &now);
 }

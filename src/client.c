@@ -848,7 +848,8 @@ static void handle_xdg_commit(struct wl_listener *l, void *data)
 	struct wlr_xdg_toplevel *t = c->s.xdg;
 
 	if (t->base->initial_commit) {
-		wlr_xdg_toplevel_set_wm_capabilities(t, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN);
+		wlr_xdg_toplevel_set_wm_capabilities(t, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
+			WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE);
 		wlr_xdg_toplevel_set_tiled(t, WLR_EDGE_TOP | WLR_EDGE_BOTTOM | WLR_EDGE_LEFT | WLR_EDGE_RIGHT);
 		if (c->deco)
 			deco_apply(c);
