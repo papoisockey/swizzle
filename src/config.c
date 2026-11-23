@@ -942,8 +942,10 @@ bool config_load(struct config *c, const char *path)
 	nerrors = 0;
 	FILE *f = path ? fopen(path, "r") : NULL;
 	if (!f) {
-		if (path)
+		if (path) {
 			wlr_log(WLR_ERROR, "cannot open config %s: %s", path, strerror(errno));
+			c->path = strdup(path);
+		}
 		wlr_log(WLR_INFO, "using built-in fallback bindings");
 		for (size_t i = 0; i < LENGTH(fallback_binds); i++)
 			add_bind(c, fallback_binds[i][0], fallback_binds[i][1], 0);

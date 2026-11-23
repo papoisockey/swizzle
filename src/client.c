@@ -190,7 +190,8 @@ void client_set_active(struct client *c, bool on)
 static void client_set_urgent(struct client *c, bool urgent)
 {
 	c->urgent = urgent;
-	client_set_border_color(c, urgent ? srv.conf.border_urgent : client_border_color(c));
+	client_set_border_color(c, client_border_color(c));
+	effects_resize(c);
 	state_changed();
 }
 
