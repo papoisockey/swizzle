@@ -796,7 +796,7 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 		wlr_scene_node_raise_to_top(&c->scene->node);
 	} else if (may_focus)
 		focus_client(c, true);
-	else if (m && client_visible(c))
+	else if (m)
 		client_set_urgent(c, true);
 	arrange(m);
 	effects_map(c);
