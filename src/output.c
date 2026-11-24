@@ -118,7 +118,7 @@ void output_apply_config(struct monitor *m)
 	m->cfg = next;
 	m->oc = eff;
 	m->vrr_failed = false;
-	bool sw = oc->hardware_cursor == 0;
+	bool sw = oc->hardware_cursor == 0 || (oc->hardware_cursor == 2 && srv.is_virtual);
 	if (sw != m->swcursor_locked) {
 		wlr_output_lock_software_cursors(m->output, sw);
 		m->swcursor_locked = sw;

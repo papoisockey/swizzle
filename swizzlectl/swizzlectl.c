@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -73,9 +74,21 @@ int main(int argc, char *argv[])
 	int status = 0;
 	char buf[4096];
 	ssize_t r;
+	bool first = true;
 	while ((r = read(fd, buf, sizeof(buf))) > 0) {
-		if (r >= 7 && !strncmp(buf, "error: ", 7))
-			status = 1;
+		/* the reply to a command is one line, but it may arrive in pieces */
+		static const char tag[] = "error: ";
+		static size_t seen;
+		for (ssize_t i = 0; first && i < r; i++) {
+			if (buf[i] == '\n' || buf[i] != tag[seen]) {
+				first = false;
+				break;
+			}
+			if (++seen == sizeof(tag) - 1) {
+				status = 1;
+				first = false;
+			}
+		}
 		fwrite(buf, 1, (size_t)r, stdout);
 		fflush(stdout);
 	}

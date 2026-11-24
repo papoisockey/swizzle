@@ -569,10 +569,12 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 			c->renderer = RENDERER_VULKAN;
 		else if (!strcmp(v, "gles"))
 			c->renderer = RENDERER_GLES;
+		else if (!strcmp(v, "pixman"))
+			c->renderer = RENDERER_PIXMAN;
 		else if (!strcmp(v, "auto"))
 			c->renderer = RENDERER_AUTO;
 		else
-			conf_error("config:%d: invalid renderer '%s', use auto, vulkan or gles", line, v);
+			conf_error("config:%d: invalid renderer '%s', use auto, vulkan, gles or pixman", line, v);
 	} else if (!strcmp(k, "border_width")) {
 		SET_NUM(c->border_width, v, 0, 100);
 	} else if (!strcmp(k, "border_outer_width")) {
@@ -754,7 +756,10 @@ static void parse_output(struct output_conf *o, const char *k, const char *v, in
 	} else if (!strcmp(k, "direct_scanout")) {
 		SET_BOOL(o->direct_scanout, v);
 	} else if (!strcmp(k, "hardware_cursor")) {
-		SET_BOOL(o->hardware_cursor, v);
+		if (!strcmp(v, "auto"))
+			o->hardware_cursor = 2;
+		else
+			SET_BOOL(o->hardware_cursor, v);
 	} else if (!strcmp(k, "primary")) {
 		SET_BOOL(o->primary, v);
 	} else if (!strcmp(k, "tag_layouts")) {
@@ -1079,7 +1084,7 @@ void config_output(const char *name, struct output_conf *out)
 	merged.vrr = VRR_FULLSCREEN;
 	merged.tearing = 0;
 	merged.direct_scanout = 0;
-	merged.hardware_cursor = 1;
+	merged.hardware_cursor = 2;
 	merged.layout = 0;
 	merged.primary = 0;
 	for (int t = 0; t < TAGCOUNT; t++)

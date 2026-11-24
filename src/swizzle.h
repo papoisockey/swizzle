@@ -36,7 +36,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define LISTEN(sig, l, fn) ((l)->notify = (fn), wl_signal_add((sig), (l)))
 
-enum renderer_pref { RENDERER_AUTO, RENDERER_VULKAN, RENDERER_GLES };
+enum renderer_pref { RENDERER_AUTO, RENDERER_VULKAN, RENDERER_GLES, RENDERER_PIXMAN };
 enum vrr_mode { VRR_OFF, VRR_ON, VRR_FULLSCREEN, VRR_CONTENT };
 enum attach { ATTACH_TOP, ATTACH_ASIDE, ATTACH_BOTTOM };
 enum anim_kind { ANIM_NONE, ANIM_SLIDE, ANIM_ZOOM };
@@ -352,6 +352,8 @@ struct server {
 #endif
 
 	bool is_nvidia;
+	bool is_virtual;
+	bool soft_gpu;
 	int drm_fd;
 
 	struct wl_list monitors;

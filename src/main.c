@@ -11,11 +11,15 @@
 #include <xf86drm.h>
 #include <wlr/config.h>
 #include <wlr/render/gles2.h>
+#include <wlr/render/pixman.h>
 #ifdef WITH_SCENEFX
 #include <scenefx/render/fx_renderer/fx_renderer.h>
 #endif
 #if WLR_HAS_VULKAN_RENDERER
-#include <wlr/render/vulkan.h>
+/* declared here instead of including wlr/render/vulkan.h, which pulls in the
+ * vulkan headers even when the vulkan renderer is never picked */
+struct wlr_renderer *wlr_vk_renderer_create_with_drm_fd(int drm_fd);
+bool wlr_renderer_is_vk(struct wlr_renderer *wlr_renderer);
 #endif
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_data_control_v1.h>
@@ -158,6 +162,17 @@ static void detect_driver(void)
 	if (!v)
 		return;
 	srv.is_nvidia = !strcmp(v->name, "nvidia-drm");
+	/* virtual machine gpus: their cursor planes often show nothing, and the
+	 * ones without 3d make gles run on llvmpipe, slower than pixman */
+	static const char *soft[] = {"vmwgfx", "vboxvideo", "qxl", "bochs", "bochs-drm", "cirrus", "simpledrm"};
+	for (size_t i = 0; i < LENGTH(soft); i++)
+		if (!strcmp(v->name, soft[i]))
+			srv.is_virtual = srv.soft_gpu = true;
+	if (!strcmp(v->name, "virtio_gpu"))
+		srv.is_virtual = true;
+	if (srv.is_virtual)
+		wlr_log(WLR_INFO, "virtual gpu %s: software cursor%s by default", v->name,
+			srv.soft_gpu ? ", pixman renderer" : "");
 	char *node = drmGetDeviceNameFromFd2(srv.drm_fd);
 	wlr_log(WLR_INFO, "rendering GPU: %s, driver %s %d.%d.%d", node ? node : "unknown", v->name, v->version_major,
 		v->version_minor, v->version_patchlevel);
@@ -178,6 +193,8 @@ static struct wlr_renderer *try_renderer(enum renderer_pref pref)
 #endif
 	case RENDERER_GLES:
 		return wlr_gles2_renderer_create_with_drm_fd(srv.drm_fd);
+	case RENDERER_PIXMAN:
+		return wlr_pixman_renderer_create();
 	default:
 		return NULL;
 	}
@@ -190,26 +207,29 @@ static struct wlr_renderer *create_renderer(void)
 		wlr_log(WLR_INFO, "built with scenefx, renderer = vulkan and WLR_RENDERER are ignored");
 	struct wlr_renderer *fx = srv.drm_fd >= 0 ? fx_renderer_create_with_drm_fd(srv.drm_fd) : fx_renderer_create(srv.backend);
 	wlr_log(WLR_INFO, "renderer: scenefx gles%s", fx ? "" : " failed");
+	if (srv.soft_gpu)
+		wlr_log(WLR_ERROR, "scenefx needs gles, which is slow on this virtual gpu: build with -Dscenefx=disabled");
 	return fx;
 #endif
 	if (getenv("WLR_RENDERER") || srv.drm_fd < 0)
 		return wlr_renderer_autocreate(srv.backend);
 
+	static const char *names[] = {"auto", "vulkan", "gles", "pixman"};
 	enum renderer_pref pref = srv.conf.renderer;
 	if (pref == RENDERER_AUTO)
-		pref = srv.is_nvidia ? RENDERER_VULKAN : RENDERER_GLES;
-	enum renderer_pref other = pref == RENDERER_VULKAN ? RENDERER_GLES : RENDERER_VULKAN;
+		pref = srv.is_nvidia ? RENDERER_VULKAN : srv.soft_gpu ? RENDERER_PIXMAN : RENDERER_GLES;
+	enum renderer_pref other = pref == RENDERER_GLES ? RENDERER_VULKAN : RENDERER_GLES;
 
 	struct wlr_renderer *r = try_renderer(pref);
 	if (!r) {
-		wlr_log(WLR_ERROR, "%s renderer failed, falling back", pref == RENDERER_VULKAN ? "vulkan" : "gles");
+		wlr_log(WLR_ERROR, "%s renderer failed, falling back", names[pref]);
 		r = try_renderer(other);
 	}
 	if (!r)
 		r = wlr_renderer_autocreate(srv.backend);
 	if (!r)
 		return NULL;
-	const char *name = wlr_renderer_is_gles2(r) ? "gles2" : "other";
+	const char *name = wlr_renderer_is_gles2(r) ? "gles2" : wlr_renderer_is_pixman(r) ? "pixman" : "other";
 #if WLR_HAS_VULKAN_RENDERER
 	if (wlr_renderer_is_vk(r))
 		name = "vulkan";
@@ -406,13 +426,17 @@ static int init_config(void)
 		close(fd);
 	size_t n;
 	bool ok = out != NULL;
+	int err = ok ? 0 : errno;
 	while (ok && (n = fread(buf, 1, sizeof(buf), in)) > 0)
-		ok = fwrite(buf, 1, n, out) == n;
+		if (!(ok = fwrite(buf, 1, n, out) == n))
+			err = errno;
+	if (ok && ferror(in))
+		ok = false, err = EIO;
 	fclose(in);
-	if (out && fclose(out) != 0)
-		ok = false;
+	if (out && fclose(out) != 0 && ok)
+		ok = false, err = errno;
 	if (!ok) {
-		fprintf(stderr, "swizzle: cannot write %s: %s\n", dst, strerror(errno));
+		fprintf(stderr, "swizzle: cannot write %s: %s\n", dst, strerror(err));
 		return 1;
 	}
 	printf("wrote %s\n", dst);

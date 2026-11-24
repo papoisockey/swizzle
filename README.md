@@ -71,5 +71,7 @@ swizzlectl subscribe           # stream of tags, focus, title, layout events
 
 - The default config uses foot, wofi, wpctl, playerctl and brightnessctl.
 - Screen sharing needs xdg-desktop-portal-wlr and xdg-desktop-portal-gtk.
+- On virtual machine gpus (VirtualBox, VMware, QXL, bochs) it renders with pixman and draws the cursor in software; `renderer = gles` in `[general]` and `hardware_cursor = 1` in `[output *]` turn that back. A config copied before this needs `hardware_cursor = auto`. For VMs build with `-Dscenefx=disabled`, scenefx only renders with gles.
+- Vulkan headers are not needed to build; whether libvulkan is needed at run time depends on how wlroots was built (`-Drenderers=gles2` leaves it out).
 - The log is in `~/.local/state/swizzle/swizzle.log`, attach it to bug reports.
 - Ideas from dwl, niri and KWin. AGPL-3.0-or-later, the files in `protocols/` keep their own license.

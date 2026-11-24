@@ -130,7 +130,12 @@ struct client *client_last_focused(void)
 struct client *client_at(double x, double y, struct wlr_surface **surf, double *sx, double *sy)
 {
 	double nx, ny;
-	struct wlr_scene_node *node = wlr_scene_node_at(&srv.scene->tree.node, x, y, &nx, &ny);
+	struct wlr_scene_node *node = NULL;
+	/* top to bottom, skipping the drag icons: they sit under the cursor and
+	 * would otherwise take the pointer and the drop away from the windows */
+	for (int l = LYR_COUNT - 1; l >= 0 && !node; l--)
+		if (l != LYR_DRAG)
+			node = wlr_scene_node_at(&srv.layers[l]->node, x, y, &nx, &ny);
 	if (surf)
 		*surf = NULL;
 	if (!node)
@@ -1123,6 +1128,8 @@ static void handle_x11_unmap(struct wl_listener *l, void *data)
 		c->mapped = false;
 		if (srv.seat->keyboard_state.focused_surface == c->s.xwl->surface)
 			focus_top(srv.selmon);
+		wlr_scene_node_set_enabled(&c->scene->node, false);
+		input_motion(0, true);
 	} else {
 		client_unmapped(c);
 	}
@@ -1156,7 +1163,7 @@ static void handle_x11_configure(struct wl_listener *l, void *data)
 			wlr_scene_node_set_position(&c->scene->node, ev->x, ev->y);
 		return;
 	}
-	if (c->floating && !c->fullscreen && c != srv.grab_c) {
+	if (c->floating && !c->fullscreen && !c->maximized && c != srv.grab_c) {
 		int bw = border_of(c);
 		client_resize(c, (struct wlr_box){ev->x - bw, ev->y - bw, ev->width + 2 * bw, ev->height + 2 * bw});
 		effects_settle(c);
