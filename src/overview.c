@@ -55,8 +55,11 @@ void overview_arrange(struct monitor *m)
 
 void overview_hotarea(double x, double y)
 {
-	struct monitor *m = output_at(x, y);
+	struct monitor *m = output_at(x, y), *o;
 	int s = srv.conf.hotarea_size;
+	wl_list_for_each(o, &srv.monitors, link)
+		if (o != m)
+			o->in_hotarea = false;
 	if (!m || s <= 0 || srv.locked)
 		return;
 	bool right = srv.conf.hotarea_corner == CORNER_TOP_RIGHT || srv.conf.hotarea_corner == CORNER_BOTTOM_RIGHT;

@@ -796,7 +796,7 @@ static void center_tile(struct monitor *m)
 	struct client *c;
 	int n = count_tiled(m), i = 0;
 	int nmaster = MIN(m->nmaster, n), nstack = n - nmaster;
-	if (!nmaster || !nstack) {
+	if (!nmaster || nstack < 2) {
 		master_stack(m, false, false, false);
 		return;
 	}
@@ -947,11 +947,11 @@ static int column_size(struct client *head)
 	return n;
 }
 
-static int strip_size(struct client *c, int len, int n)
+static int strip_size(struct client *c, int len, int gap, int n)
 {
 	float share = c->scroll_width > 0 ? c->scroll_width :
 		n == 1 && srv.conf.scroll_width_single > 0 ? srv.conf.scroll_width_single : srv.conf.scroll_width;
-	int s = (int)(len * share);
+	int s = MAX(1, (int)((len + gap) * share) - gap);
 	return share >= 1.0f ? MAX(1, s - 2 * srv.conf.scroll_struts) : s;
 }
 
@@ -971,7 +971,7 @@ static void scroll_strip(struct monitor *m, bool vertical)
 			if (head)
 				pos += size + gap;
 			head = c;
-			size = strip_size(c, len, n);
+			size = strip_size(c, len, gap, n);
 		}
 		if (c == f)
 			fpos = pos, fsize = size;
@@ -995,7 +995,7 @@ static void scroll_strip(struct monitor *m, bool vertical)
 			if (head)
 				pos += size + gap;
 			head = c;
-			size = strip_size(c, len, n);
+			size = strip_size(c, len, gap, n);
 			k = 0;
 			cnt = vertical ? 1 : column_size(c);
 		}

@@ -299,6 +299,11 @@ static uint32_t binding_mods(struct wlr_keyboard *kb)
 	return kb ? wlr_keyboard_get_modifiers(kb) & ~(WLR_MODIFIER_CAPS | WLR_MODIFIER_MOD2) : 0;
 }
 
+static uint32_t pointer_mods(void)
+{
+	return binding_mods(&srv.kb_group->keyboard) | binding_mods(wlr_seat_get_keyboard(srv.seat));
+}
+
 static bool repeatable(const char *cmd)
 {
 	static const char *ok[] = {"focus", "swap", "mfact", "nmaster", "viewnext", "viewprev"};
@@ -929,8 +934,7 @@ static void handle_button(struct wl_listener *l, void *data)
 		struct wlr_surface *surf;
 		double sx, sy;
 		struct client *c = client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
-		struct wlr_keyboard *kb = wlr_seat_get_keyboard(srv.seat);
-		uint32_t mods = binding_mods(kb);
+		uint32_t mods = pointer_mods();
 		bool repeat;
 
 		input_click_focus(c, surf);
@@ -970,7 +974,7 @@ static void handle_axis(struct wl_listener *l, void *data)
 	if (locked_virtual(ev->pointer))
 		return;
 	locked_end_grabs();
-	uint32_t mods = binding_mods(wlr_seat_get_keyboard(srv.seat));
+	uint32_t mods = pointer_mods();
 	if (ev->delta != 0) {
 		bool vert = ev->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL;
 		xkb_keysym_t sym = SYM_WHEEL + (vert ? (ev->delta < 0 ? 0 : 1) : (ev->delta < 0 ? 2 : 3));
@@ -1121,10 +1125,12 @@ static void handle_swipe_end(struct wl_listener *l, void *data)
 	double dx = srv.swipe_dx, dy = srv.swipe_dy, t = srv.conf.swipe_threshold;
 	if (ev->cancelled || srv.locked || !srv.selmon || (fabs(dx) < t && fabs(dy) < t))
 		return;
+	if (!bindings_allowed())
+		return;
 	bool horiz = fabs(dx) >= fabs(dy), repeat;
 	int dir = horiz ? (dx < 0 ? 0 : 1) : (dy < 0 ? 2 : 3);
-	uint32_t mods = binding_mods(wlr_seat_get_keyboard(srv.seat));
-	if (bindings_allowed() && has_binding(mods, SYM_SWIPE_OF(fingers, dir))) {
+	uint32_t mods = pointer_mods();
+	if (has_binding(mods, SYM_SWIPE_OF(fingers, dir))) {
 		run_binding(mods, SYM_SWIPE_OF(fingers, dir), &repeat);
 		return;
 	}
