@@ -25,7 +25,7 @@ static struct client *selected(void)
 	return target ? target : client_focused();
 }
 
-static bool reload_config(void)
+static bool reload_config(char *err, size_t len)
 {
 	struct config next;
 	char *path = srv.conf_arg ? strdup(srv.conf_arg) : config_default_path();
@@ -33,6 +33,7 @@ static bool reload_config(void)
 	free(path);
 	if (!ok) {
 		config_free(&next);
+		snprintf(err, len, "config reload failed");
 		return false;
 	}
 	if (next.renderer != srv.conf.renderer)
@@ -63,6 +64,10 @@ static bool reload_config(void)
 	output_update_all();
 	ipc_event("reload");
 	wlr_log(WLR_INFO, "config reloaded");
+	if (srv.conf.errors) {
+		snprintf(err, len, "config reloaded with %d errors, see swizzle --validate", srv.conf.errors);
+		return false;
+	}
 	return true;
 }
 
@@ -121,11 +126,7 @@ static bool a_quit(const char *arg, char *err, size_t len)
 
 static bool a_reload(const char *arg, char *err, size_t len)
 {
-	if (!reload_config()) {
-		snprintf(err, len, "config reload failed");
-		return false;
-	}
-	return true;
+	return reload_config(err, len);
 }
 
 static const struct {

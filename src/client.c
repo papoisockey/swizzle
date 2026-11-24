@@ -389,10 +389,13 @@ void client_send_to_monitor(struct client *c, struct monitor *m, uint32_t tags)
 {
 	struct monitor *old = c->mon;
 	uint32_t newtags = tags & tag_mask() ? tags & tag_mask() : m ? m->tags : 1;
-	if (old && (old != m || newtags != c->tags))
+	bool moved = !old || old != m || newtags != c->tags;
+	if (old && moved)
 		client_leave_column(c);
 	c->mon = m;
 	c->tags = newtags;
+	if (moved)
+		client_join_strip(c);
 	if (c->ftl && old != m) {
 		if (old)
 			wlr_foreign_toplevel_handle_v1_output_leave(c->ftl, old->output);

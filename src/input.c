@@ -892,7 +892,11 @@ static void end_grab(void)
 		input_cancel_grab();
 		if (c) {
 			client_restack(c);
-			client_drop_on(c, target);
+			struct monitor *m = output_at(srv.cursor->x, srv.cursor->y);
+			if (!target && m && m != c->mon)
+				client_send_to_monitor(c, m, m->tags);
+			else
+				client_drop_on(c, target);
 			if (c->mon)
 				srv.selmon = c->mon;
 		}
@@ -1060,7 +1064,7 @@ static void handle_touch_down(struct wl_listener *l, void *data)
 	wlr_cursor_absolute_to_layout_coords(srv.cursor, &ev->touch->base, ev->x, ev->y, &lx, &ly);
 	struct client *c = client_at(lx, ly, &surf, &sx, &sy);
 	input_click_focus(c, surf);
-	if (!surf)
+	if (!surf || input_overview_pick(c))
 		return;
 	int old = finger(ev->touch_id);
 	if (old >= 0)

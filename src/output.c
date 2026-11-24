@@ -943,6 +943,18 @@ static struct client *column_last(struct client *head)
 	return last;
 }
 
+void client_join_strip(struct client *c)
+{
+	if (!c->mon || c->scroll_stacked || !tiled(c, c->mon))
+		return;
+	struct client *next = tiled_neighbor(c, 1);
+	if (!next || !next->scroll_stacked)
+		return;
+	struct client *last = column_last(next);
+	wl_list_remove(&c->link);
+	wl_list_insert(&last->link, &c->link);
+}
+
 #if defined(WITH_SCROLL) || defined(WITH_VERTICAL_SCROLL)
 static int column_size(struct client *head)
 {
@@ -1543,9 +1555,12 @@ void tag(struct client *c, uint32_t tags)
 	bool was_focused = c == client_focused();
 	if (c->scratch)
 		scratch_leave(c);
-	if (c->tags != tags)
+	bool moved = c->tags != tags;
+	if (moved)
 		client_leave_column(c);
 	c->tags = tags;
+	if (moved)
+		client_join_strip(c);
 	if (was_focused)
 		focus_top(c->mon);
 	arrange(c->mon);
