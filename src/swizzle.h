@@ -476,6 +476,7 @@ void client_drop_on(struct client *c, struct client *target);
 struct wlr_box client_fit(struct wlr_box b, struct monitor *m);
 const float *client_border_color(struct client *c);
 void client_update_border(struct client *c);
+void client_leave_column(struct client *c);
 
 void shell_init(void);
 void shell_finish(void);

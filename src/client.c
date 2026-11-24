@@ -382,8 +382,11 @@ void client_update_borders(void)
 void client_send_to_monitor(struct client *c, struct monitor *m, uint32_t tags)
 {
 	struct monitor *old = c->mon;
+	uint32_t newtags = tags & tag_mask() ? tags & tag_mask() : m ? m->tags : 1;
+	if (old && (old != m || newtags != c->tags))
+		client_leave_column(c);
 	c->mon = m;
-	c->tags = tags & tag_mask() ? tags & tag_mask() : m ? m->tags : 1;
+	c->tags = newtags;
 	if (c->ftl && old != m) {
 		if (old)
 			wlr_foreign_toplevel_handle_v1_output_leave(c->ftl, old->output);
@@ -770,17 +773,17 @@ static bool column_member(struct client *c)
 	return !c->floating && !c->fullscreen && !c->scratch && !c->maximized;
 }
 
-static void column_promote(struct client *c)
+void client_leave_column(struct client *c)
 {
-	if (c->scroll_stacked || !column_member(c))
-		return;
-	for (struct wl_list *it = c->link.next; it != &srv.clients; it = it->next) {
-		struct client *o = wl_container_of(it, o, link);
-		if (o->mon != c->mon || !(o->tags & c->tags) || !column_member(o))
-			continue;
-		o->scroll_stacked = false;
-		return;
-	}
+	if (!c->scroll_stacked && column_member(c) && !wl_list_empty(&c->link))
+		for (struct wl_list *it = c->link.next; it != &srv.clients; it = it->next) {
+			struct client *o = wl_container_of(it, o, link);
+			if (o->mon != c->mon || !(o->tags & c->tags) || o->minimized || !column_member(o))
+				continue;
+			o->scroll_stacked = false;
+			break;
+		}
+	c->scroll_stacked = false;
 }
 
 static void client_unmapped(struct client *c)
@@ -794,7 +797,7 @@ static void client_unmapped(struct client *c)
 	c->mapped = false;
 	c->active = false;
 	ftl_destroy(c);
-	column_promote(c);
+	client_leave_column(c);
 	wl_list_remove(&c->link);
 	wl_list_remove(&c->flink);
 	wl_list_init(&c->link);

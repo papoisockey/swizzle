@@ -183,7 +183,7 @@ static bool a_layout(const char *arg, char *err, size_t len)
 	return true;
 }
 
-#ifdef WITH_SCROLL
+#if defined(WITH_SCROLL) || defined(WITH_VERTICAL_SCROLL)
 static bool a_width(const char *arg, char *err, size_t len)
 {
 	struct client *c = selected();

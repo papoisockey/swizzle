@@ -1507,6 +1507,8 @@ void tag(struct client *c, uint32_t tags)
 	bool was_focused = c == client_focused();
 	if (c->scratch)
 		scratch_leave(c);
+	if (c->tags != (tags & TAGMASK))
+		client_leave_column(c);
 	c->tags = tags & TAGMASK;
 	if (was_focused)
 		focus_top(c->mon);
