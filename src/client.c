@@ -190,11 +190,16 @@ void client_set_active(struct client *c, bool on)
 	wlr_xdg_toplevel_set_activated(c->s.xdg, on);
 }
 
+void client_update_border(struct client *c)
+{
+	client_set_border_color(c, client_border_color(c));
+	effects_resize(c);
+}
+
 static void client_set_urgent(struct client *c, bool urgent)
 {
 	c->urgent = urgent;
-	client_set_border_color(c, client_border_color(c));
-	effects_resize(c);
+	client_update_border(c);
 	state_changed();
 }
 
@@ -538,8 +543,7 @@ void client_set_maximized(struct client *c, bool on)
 		client_resize(c, c->prev);
 	if (c->ftl)
 		wlr_foreign_toplevel_handle_v1_set_maximized(c->ftl, on);
-	client_set_border_color(c, client_border_color(c));
-	effects_resize(c);
+	client_update_border(c);
 	arrange(c->mon);
 }
 
@@ -564,8 +568,7 @@ void client_set_overlay(struct client *c, bool on)
 		return;
 	c->overlay = on;
 	client_restack(c);
-	client_set_border_color(c, client_border_color(c));
-	effects_resize(c);
+	client_update_border(c);
 	arrange(c->mon);
 }
 
@@ -762,6 +765,24 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 	ipc_client_event("map", c);
 }
 
+static bool column_member(struct client *c)
+{
+	return !c->floating && !c->fullscreen && !c->scratch && !c->maximized;
+}
+
+static void column_promote(struct client *c)
+{
+	if (c->scroll_stacked || !column_member(c))
+		return;
+	for (struct wl_list *it = c->link.next; it != &srv.clients; it = it->next) {
+		struct client *o = wl_container_of(it, o, link);
+		if (o->mon != c->mon || !(o->tags & c->tags) || !column_member(o))
+			continue;
+		o->scroll_stacked = false;
+		return;
+	}
+}
+
 static void client_unmapped(struct client *c)
 {
 	bool was_focused = c == client_focused();
@@ -773,6 +794,7 @@ static void client_unmapped(struct client *c)
 	c->mapped = false;
 	c->active = false;
 	ftl_destroy(c);
+	column_promote(c);
 	wl_list_remove(&c->link);
 	wl_list_remove(&c->flink);
 	wl_list_init(&c->link);

@@ -210,6 +210,7 @@ static bool a_sticky(const char *arg, char *err, size_t len)
 		return true;
 	bool was_focused = c == client_focused();
 	c->sticky = !c->sticky;
+	client_update_border(c);
 	arrange(c->mon);
 	if (was_focused && !client_reachable(c))
 		focus_top(c->mon);

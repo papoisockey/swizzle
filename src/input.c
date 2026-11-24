@@ -222,10 +222,10 @@ void input_apply_config(void)
 		wl_list_for_each(d, &keyboards, link)
 			wlr_keyboard_set_keymap(wlr_keyboard_from_input_device(d->dev), km);
 		xkb_keymap_unref(km);
-		numlock_on(&srv.kb_group->keyboard);
-		wl_list_for_each(d, &keyboards, link)
-			numlock_on(wlr_keyboard_from_input_device(d->dev));
 	}
+	numlock_on(&srv.kb_group->keyboard);
+	wl_list_for_each(d, &keyboards, link)
+		numlock_on(wlr_keyboard_from_input_device(d->dev));
 	wlr_keyboard_set_repeat_info(&srv.kb_group->keyboard, srv.conf.repeat_rate, srv.conf.repeat_delay);
 	wl_list_for_each(d, &keyboards, link)
 		wlr_keyboard_set_repeat_info(wlr_keyboard_from_input_device(d->dev), srv.conf.repeat_rate, srv.conf.repeat_delay);

@@ -1492,6 +1492,7 @@ static void scratch_leave(struct client *c)
 	else
 		client_restack(c);
 	c->scratch_floated = false;
+	client_update_border(c);
 }
 
 void tag(struct client *c, uint32_t tags)
@@ -1580,6 +1581,7 @@ void scratch_set(struct client *c, bool on)
 			client_set_floating(c, true);
 		client_restack(c);
 		scratch_fit(c);
+		client_update_border(c);
 	} else {
 		scratch_leave(c);
 	}
