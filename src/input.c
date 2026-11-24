@@ -250,12 +250,27 @@ void input_apply_config(void)
 		unsetenv("XCURSOR_THEME");
 	}
 	setenv("XCURSOR_SIZE", size, 1);
+
+	static char *loaded_theme;
+	static int loaded_size;
+	const char *theme = srv.conf.cursor_theme ? srv.conf.cursor_theme : "";
+	if (srv.xcursor_mgr && loaded_size == srv.conf.cursor_size && loaded_theme && !strcmp(loaded_theme, theme))
+		return;
+	bool reload = srv.xcursor_mgr != NULL;
+	free(loaded_theme);
+	loaded_theme = strdup(theme);
+	loaded_size = srv.conf.cursor_size;
 	wlr_cursor_unset_image(srv.cursor);
 	if (srv.xcursor_mgr)
 		wlr_xcursor_manager_destroy(srv.xcursor_mgr);
 	srv.xcursor_mgr = wlr_xcursor_manager_create(srv.conf.cursor_theme, srv.conf.cursor_size);
-	wlr_cursor_set_xcursor(srv.cursor, srv.xcursor_mgr, "default");
+	wlr_cursor_set_xcursor(srv.cursor, srv.xcursor_mgr, srv.cursor_mode == CURSOR_NORMAL ? "default" :
+		srv.grab_edges ? wlr_xcursor_get_resize_name(srv.grab_edges) : "grabbing");
 	client_update_xcursor();
+	if (reload && srv.cursor_mode == CURSOR_NORMAL) {
+		wlr_seat_pointer_notify_clear_focus(srv.seat);
+		input_motion(0, true);
+	}
 }
 
 static void handle_new_input(struct wl_listener *l, void *data)
@@ -733,6 +748,29 @@ static void snap(struct wlr_box *b, struct client *c)
 		b->y += best[1];
 }
 
+static struct client *hover(uint32_t time, struct wlr_surface **surf, double *sx, double *sy)
+{
+	if (time) {
+		struct monitor *m = output_at(srv.cursor->x, srv.cursor->y);
+		if (m)
+			srv.selmon = m;
+		overview_hotarea(srv.cursor->x, srv.cursor->y);
+	}
+	struct client *c = client_at(srv.cursor->x, srv.cursor->y, surf, sx, sy);
+	if (time && srv.conf.focus_follows_mouse && c && c->type != CLIENT_X11_UNMANAGED && c != client_focused() &&
+			!srv.exclusive_focus && !layer_from_surface(srv.seat->keyboard_state.focused_surface) &&
+			srv.seat->pointer_state.grab == srv.seat->pointer_state.default_grab)
+		focus_client(c, false);
+	return c;
+}
+
+void input_hover(uint32_t time)
+{
+	struct wlr_surface *surf;
+	double sx, sy;
+	hover(time, &surf, &sx, &sy);
+}
+
 void input_motion(uint32_t time, bool warp_only)
 {
 	struct wlr_surface *surf = NULL;
@@ -771,19 +809,9 @@ void input_motion(uint32_t time, bool warp_only)
 		return;
 	}
 
-	if (time) {
-		struct monitor *m = output_at(srv.cursor->x, srv.cursor->y);
-		if (m)
-			srv.selmon = m;
-		overview_hotarea(srv.cursor->x, srv.cursor->y);
-	}
-	c = client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
+	c = hover(time, &surf, &sx, &sy);
 	if (!surf && !srv.seat->drag && !warp_only)
 		wlr_cursor_set_xcursor(srv.cursor, srv.xcursor_mgr, "default");
-	if (time && srv.conf.focus_follows_mouse && c && c->type != CLIENT_X11_UNMANAGED && c != client_focused() &&
-			!srv.exclusive_focus && !layer_from_surface(srv.seat->keyboard_state.focused_surface) &&
-			srv.seat->pointer_state.grab == srv.seat->pointer_state.default_grab)
-		focus_client(c, false);
 
 	if (!surf) {
 		wlr_seat_pointer_notify_clear_focus(srv.seat);
@@ -904,32 +932,28 @@ static void swallow(uint32_t button)
 		}
 }
 
-static void handle_button(struct wl_listener *l, void *data)
+void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state state)
 {
-	struct wlr_pointer_button_event *ev = data;
-
-	if (ev->state == WL_POINTER_BUTTON_STATE_PRESSED && locked_virtual(ev->pointer))
-		return;
 	locked_end_grabs();
 	if (srv.cursor_mode != CURSOR_NORMAL) {
-		if (ev->state != WL_POINTER_BUTTON_STATE_RELEASED || (grab_button && ev->button != grab_button))
+		if (state != WL_POINTER_BUTTON_STATE_RELEASED || (grab_button && button != grab_button))
 			return;
 		end_grab();
 		for (size_t i = 0; i < srv.seat->pointer_state.button_count; i++)
-			if (srv.seat->pointer_state.buttons[i].button == ev->button) {
-				wlr_seat_pointer_notify_button(srv.seat, ev->time_msec, ev->button, ev->state);
+			if (srv.seat->pointer_state.buttons[i].button == button) {
+				wlr_seat_pointer_notify_button(srv.seat, time, button, state);
 				break;
 			}
 		return;
 	}
 	for (size_t i = 0; i < LENGTH(swallowed); i++)
-		if (ev->state == WL_POINTER_BUTTON_STATE_RELEASED && swallowed[i] == ev->button) {
+		if (state == WL_POINTER_BUTTON_STATE_RELEASED && swallowed[i] == button) {
 			swallowed[i] = 0;
 			return;
 		}
-	if (ev->state == WL_POINTER_BUTTON_STATE_PRESSED) {
+	if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
 		for (size_t i = 0; i < LENGTH(swallowed); i++)
-			if (swallowed[i] == ev->button)
+			if (swallowed[i] == button)
 				swallowed[i] = 0;
 		struct wlr_surface *surf;
 		double sx, sy;
@@ -938,15 +962,15 @@ static void handle_button(struct wl_listener *l, void *data)
 		bool repeat;
 
 		input_click_focus(c, surf);
-		if (bindings_allowed() && has_binding(mods, SYM_BUTTON + ev->button)) {
-			swallow(ev->button);
-			run_binding(mods, SYM_BUTTON + ev->button, &repeat);
+		if (bindings_allowed() && has_binding(mods, SYM_BUTTON + button)) {
+			swallow(button);
+			run_binding(mods, SYM_BUTTON + button, &repeat);
 			return;
 		}
 #ifdef WITH_OVERVIEW
 		if (c && c->mon && c->mon->overview && !srv.locked) {
 			struct monitor *m = c->mon;
-			swallow(ev->button);
+			swallow(button);
 			overview_set(m, false);
 			srv.selmon = m;
 			if (!client_visible(c))
@@ -956,15 +980,23 @@ static void handle_button(struct wl_listener *l, void *data)
 		}
 #endif
 
-		if (mods == srv.conf.mouse_mod && (ev->button == BTN_LEFT || ev->button == BTN_RIGHT)) {
-			input_start_grab(c, ev->button == BTN_LEFT ? 0 : WLR_EDGE_BOTTOM | WLR_EDGE_RIGHT);
+		if (mods == srv.conf.mouse_mod && (button == BTN_LEFT || button == BTN_RIGHT)) {
+			input_start_grab(c, button == BTN_LEFT ? 0 : WLR_EDGE_BOTTOM | WLR_EDGE_RIGHT);
 			if (srv.cursor_mode != CURSOR_NORMAL) {
-				grab_button = ev->button;
+				grab_button = button;
 				return;
 			}
 		}
 	}
-	wlr_seat_pointer_notify_button(srv.seat, ev->time_msec, ev->button, ev->state);
+	wlr_seat_pointer_notify_button(srv.seat, time, button, state);
+}
+
+static void handle_button(struct wl_listener *l, void *data)
+{
+	struct wlr_pointer_button_event *ev = data;
+	if (ev->state == WL_POINTER_BUTTON_STATE_PRESSED && locked_virtual(ev->pointer))
+		return;
+	input_button(ev->time_msec, ev->button, ev->state);
 }
 
 static void handle_axis(struct wl_listener *l, void *data)

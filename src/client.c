@@ -553,7 +553,7 @@ void client_set_maximized(struct client *c, bool on)
 		wlr_xdg_toplevel_set_maximized(c->s.xdg, on);
 	client_restack(c);
 	if (!on && c->floating && !c->fullscreen)
-		client_resize(c, c->prev);
+		client_resize(c, client_fit(c->prev, c->mon));
 	if (c->ftl)
 		wlr_foreign_toplevel_handle_v1_set_maximized(c->ftl, on);
 	client_update_border(c);
@@ -714,6 +714,8 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 	int bw = srv.conf.border_width + srv.conf.border_outer_width;
 
 	c->minimized = c->maximized = c->overlay = c->fake_fullscreen = c->scroll_stacked = c->urgent = false;
+	c->scratch = c->scratch_floated = c->sticky = false;
+	c->scroll_width = 0;
 	c->split = 0;
 	c->in_overview = false;
 	apply_rules(c, &m, &tags, &rule_focus);

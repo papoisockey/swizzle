@@ -817,6 +817,13 @@ static bool handle_line(struct ipc_client *ic, char *line)
 	}
 	if (!strcmp(line, "subscribe")) {
 		char st[IPC_BUF];
+		if (srv.locked) {
+			if (!ic->subscribed)
+				nsubscribers++;
+			ic->subscribed = true;
+			last_state[0] = '\0';
+			return true;
+		}
 		size_t n = format_state(st, sizeof(st));
 		if (!nsubscribers)
 			memcpy(last_state, st, n + 1);
@@ -1004,7 +1011,7 @@ void ipc_event(const char *fmt, ...)
 {
 	char buf[1024];
 	va_list ap;
-	if (!nsubscribers)
+	if (!nsubscribers || srv.locked)
 		return;
 	va_start(ap, fmt);
 	int n = vsnprintf(buf, sizeof(buf) - 1, fmt, ap);
@@ -1041,7 +1048,7 @@ void ipc_title_event(struct client *c)
 void ipc_notify_state(void)
 {
 	char st[IPC_BUF];
-	if (!nsubscribers)
+	if (!nsubscribers || srv.locked)
 		return;
 	size_t n = format_state(st, sizeof(st));
 	if (!strcmp(st, last_state))

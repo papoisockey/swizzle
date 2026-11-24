@@ -25,6 +25,10 @@ static bool tool_motion(struct wlr_tablet *tablet, struct wlr_tablet_tool *tool,
 	double sx, sy;
 	if (!t || !tablet->data)
 		return false;
+	if (srv.cursor_mode != CURSOR_NORMAL) {
+		input_motion(time, false);
+		return false;
+	}
 	client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
 	if (!surf) {
 		wlr_send_tablet_v2_tablet_tool_proximity_out(t);
@@ -39,6 +43,9 @@ static bool tool_motion(struct wlr_tablet *tablet, struct wlr_tablet_tool *tool,
 		input_motion(time, false);
 		return false;
 	}
+	input_hover(time);
+	if (t->focused_surface != surf)
+		return false;
 	wlr_send_tablet_v2_tablet_tool_motion(t, sx, sy);
 	return true;
 }
@@ -94,17 +101,16 @@ static void handle_tool_tip(struct wl_listener *l, void *data)
 	if (!t)
 		return;
 	struct client *c = client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
-	if (down)
-		input_click_focus(c, surf);
-	if (t->focused_surface && t->focused_surface == surf) {
-		if (down)
+	if ((!down || srv.cursor_mode == CURSOR_NORMAL) && t->focused_surface && t->focused_surface == surf) {
+		if (down) {
+			input_click_focus(c, surf);
 			wlr_send_tablet_v2_tablet_tool_down(t);
-		else
+		} else {
 			wlr_send_tablet_v2_tablet_tool_up(t);
+		}
 		return;
 	}
-	wlr_seat_pointer_notify_button(srv.seat, ev->time_msec, BTN_LEFT,
-		down ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
+	input_button(ev->time_msec, BTN_LEFT, down ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
 	wlr_seat_pointer_notify_frame(srv.seat);
 }
 
@@ -114,13 +120,12 @@ static void handle_tool_button(struct wl_listener *l, void *data)
 	struct wlr_tablet_v2_tablet_tool *t = tool_v2(ev->tool);
 	if (!t)
 		return;
-	if (t->focused_surface) {
+	if ((srv.cursor_mode == CURSOR_NORMAL || !ev->state) && t->focused_surface) {
 		wlr_send_tablet_v2_tablet_tool_button(t, ev->button, (enum zwp_tablet_pad_v2_button_state)ev->state);
 		return;
 	}
 	uint32_t button = ev->button == BTN_STYLUS ? BTN_RIGHT : ev->button == BTN_STYLUS2 ? BTN_MIDDLE : ev->button;
-	wlr_seat_pointer_notify_button(srv.seat, ev->time_msec, button,
-		ev->state ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
+	input_button(ev->time_msec, button, ev->state ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
 	wlr_seat_pointer_notify_frame(srv.seat);
 }
 

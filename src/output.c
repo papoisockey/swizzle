@@ -26,6 +26,7 @@ static int tag_slot(uint32_t tags);
 static int switch_slot(struct monitor *m, uint32_t old);
 static void list_swap(struct wl_list *a, struct wl_list *b);
 static bool tiled(struct client *c, struct monitor *m);
+static int strip_columns(struct monitor *m);
 
 static bool monitor_off(struct monitor *m)
 {
@@ -1033,7 +1034,8 @@ void scroll_width(struct client *c, const char *arg)
 {
 	const float *presets = srv.conf.scroll_presets;
 	int np = srv.conf.nscroll_presets, i = 0;
-	float cur = c->scroll_width > 0 ? c->scroll_width : srv.conf.scroll_width;
+	float cur = c->scroll_width > 0 ? c->scroll_width :
+		srv.conf.scroll_width_single > 0 && strip_columns(c->mon) == 1 ? srv.conf.scroll_width_single : srv.conf.scroll_width;
 	if (arg && strcmp(arg, "next") && strcmp(arg, "prev")) {
 		double w = strtod(arg, NULL);
 		c->scroll_width = (float)(w >= 0.1 ? (w <= 1.0 ? w : 1.0) : 0.1);
@@ -1138,6 +1140,20 @@ static const struct {
 	{"vertical_scroll", vertical_scroll},
 #endif
 };
+
+static int strip_columns(struct monitor *m)
+{
+	struct client *c;
+	bool vertical = false;
+	int n = 0;
+#ifdef WITH_VERTICAL_SCROLL
+	vertical = m && layouts[m->layout].arrange == vertical_scroll;
+#endif
+	wl_list_for_each(c, &srv.clients, link)
+		if (tiled(c, m) && (vertical || !c->scroll_stacked || !n))
+			n++;
+	return n;
+}
 
 static bool layout_is(struct monitor *m, const char *name)
 {

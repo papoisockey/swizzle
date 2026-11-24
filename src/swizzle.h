@@ -439,6 +439,8 @@ void input_cancel_grab(void);
 void input_apply_grab(void);
 void input_start_grab(struct client *c, uint32_t edges);
 void input_motion(uint32_t time, bool warp_only);
+void input_hover(uint32_t time);
+void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state state);
 void input_set_focus_surface(struct wlr_surface *surface);
 void input_click_focus(struct client *c, struct wlr_surface *surf);
 void input_activity(void);
