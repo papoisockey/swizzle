@@ -78,6 +78,8 @@ static void handle_layer_commit(struct wl_listener *l, void *data)
 		wl_list_remove(&ls->link);
 		wl_list_insert(&ls->mon->layers[s->current.layer], &ls->link);
 		wlr_scene_node_reparent(&ls->scene->node, srv.layers[layermap[s->current.layer]]);
+		wlr_scene_node_set_enabled(&ls->scene->node, s->surface->mapped);
+		wlr_scene_node_set_enabled(&ls->popups->node, true);
 	}
 	if (s->initial_commit) {
 		struct wlr_layer_surface_v1_state old = s->current;

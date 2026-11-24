@@ -1200,9 +1200,11 @@ void arrange(struct monitor *m)
 		return;
 
 	struct layer_surface *ls;
-	wl_list_for_each(ls, &m->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], link)
-		wlr_scene_node_set_enabled(&ls->scene->node, ls->mapped &&
-			(!fs || ls->ls->current.keyboard_interactive != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE));
+	wl_list_for_each(ls, &m->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], link) {
+		bool shown = !fs || ls->ls->current.keyboard_interactive != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE;
+		wlr_scene_node_set_enabled(&ls->scene->node, ls->mapped && shown);
+		wlr_scene_node_set_enabled(&ls->popups->node, shown);
+	}
 
 	if (m->overview)
 		overview_arrange(m);

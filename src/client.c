@@ -520,9 +520,7 @@ bool client_restore(void)
 			continue;
 		if (m && (c->mon != m || !(c->sticky || c->scratch || (c->tags & m->tags))))
 			client_send_to_monitor(c, m, c->scratch ? c->tags : m->tags);
-		client_set_minimized(c, false);
-		if (client_visible(c))
-			focus_client(c, true);
+		client_reveal(c);
 		return true;
 	}
 	return false;
