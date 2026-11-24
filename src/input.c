@@ -779,7 +779,7 @@ void input_motion(uint32_t time, bool warp_only)
 
 	wlr_scene_node_set_position(&srv.layers[LYR_DRAG]->node, (int)srv.cursor->x, (int)srv.cursor->y);
 
-	if (srv.grab_c && (srv.grab_c->fullscreen ||
+	if (srv.grab_c && (srv.grab_c->fullscreen || !client_visible(srv.grab_c) ||
 			(srv.grab_tiled && srv.grab_c->scene->node.parent != srv.layers[LYR_FLOAT])))
 		input_cancel_grab();
 	if (srv.cursor_mode != CURSOR_NORMAL && srv.grab_c) {
@@ -965,6 +965,8 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 				wlr_seat_pointer_notify_button(srv.seat, time, button, state);
 				break;
 			}
+		wlr_seat_pointer_notify_clear_focus(srv.seat);
+		input_motion(0, true);
 		return;
 	}
 	for (size_t i = 0; i < LENGTH(swallowed); i++)

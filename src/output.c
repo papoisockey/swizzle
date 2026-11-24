@@ -1233,6 +1233,7 @@ void arrange(struct monitor *m)
 		overview_arrange(m);
 	else
 		layouts[m->layout].arrange(m);
+	input_motion(0, true);
 	state_changed();
 }
 
