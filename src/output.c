@@ -406,6 +406,11 @@ void output_update_all(void)
 			if ((!c->mon || monitor_off(c->mon)) && c->mapped)
 				client_send_to_monitor(c, srv.selmon, c->tags);
 	}
+	wl_list_for_each(c, &srv.clients, link)
+		if (c->mapped && c->mon && !monitor_off(c->mon) && c->floating && !c->fullscreen && !c->maximized &&
+				c != srv.grab_c && !wlr_box_contains_point(&c->mon->m, c->geom.x + c->geom.width / 2,
+				c->geom.y + c->geom.height / 2))
+			client_resize(c, client_fit(c->geom, c->mon));
 	lock_arrange();
 	update_output_manager();
 	output_update_root();
