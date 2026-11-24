@@ -704,18 +704,33 @@ static void parse_input(struct config *c, const char *k, const char *v, int line
 	}
 }
 
+static bool int_pair(const char *v, char sep, long lo, long hi, int *a, int *b, const char **rest)
+{
+	char *end;
+	errno = 0;
+	long x = strtol(v, &end, 10);
+	if (end == v || *end != sep || errno || x < lo || x > hi)
+		return false;
+	const char *s = end + 1;
+	long y = strtol(s, &end, 10);
+	if (end == s || errno || y < lo || y > hi)
+		return false;
+	*a = (int)x, *b = (int)y, *rest = end;
+	return true;
+}
+
 static void parse_output(struct output_conf *o, const char *k, const char *v, int line)
 {
 	if (!strcmp(k, "mode")) {
 		o->refresh = 0;
-		int n = 0;
+		const char *r = NULL;
 		char *end = NULL;
-		bool ok = sscanf(v, "%dx%d%n", &o->width, &o->height, &n) == 2;
-		if (ok && v[n] == '@') {
-			o->refresh = strtof(v + n + 1, &end);
-			ok = end != v + n + 1 && (!*end || !strcasecmp(end, "hz"));
+		bool ok = int_pair(v, 'x', 1, 16384, &o->width, &o->height, &r);
+		if (ok && *r == '@') {
+			o->refresh = strtof(r + 1, &end);
+			ok = end != r + 1 && (!*end || !strcasecmp(end, "hz"));
 		} else if (ok)
-			ok = !v[n];
+			ok = !*r;
 		if (!ok || o->width <= 0 || o->height <= 0 ||
 				o->width > 16384 || o->height > 16384 || !(o->refresh >= 0 && o->refresh <= 1000)) {
 			conf_error("config:%d: invalid mode '%s'", line, v);
@@ -727,9 +742,8 @@ static void parse_output(struct output_conf *o, const char *k, const char *v, in
 		if (parse_num(v, 0.0, 10.0, &s))
 			o->scale = s > 0 && s < 0.25 ? 0.25f : (float)s;
 	} else if (!strcmp(k, "position")) {
-		int n = 0;
-		o->has_pos = sscanf(v, "%d,%d%n", &o->x, &o->y, &n) == 2 && !v[n] && o->x > -1000000 && o->x < 1000000 &&
-			o->y > -1000000 && o->y < 1000000;
+		const char *r = NULL;
+		o->has_pos = int_pair(v, ',', -999999, 999999, &o->x, &o->y, &r) && !*r;
 		if (!o->has_pos)
 			conf_error("config:%d: invalid position '%s'", line, v);
 	} else if (!strcmp(k, "transform")) {
@@ -896,6 +910,7 @@ static enum section open_section(struct config *c, char *name, int line)
 		c->rules[c->nrules - 1].fullscreen = -1;
 		c->rules[c->nrules - 1].scratchpad = -1;
 		c->rules[c->nrules - 1].sticky = -1;
+		c->rules[c->nrules - 1].focus = -1;
 		return SEC_RULE;
 	}
 	if (!strcmp(name, "output")) {

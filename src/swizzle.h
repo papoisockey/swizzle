@@ -71,7 +71,7 @@ struct rule {
 	int fullscreen;
 	int scratchpad;
 	int sticky;
-	bool focus;
+	int focus;
 	uint32_t tags;
 	char *output;
 };

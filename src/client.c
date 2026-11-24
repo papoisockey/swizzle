@@ -657,8 +657,8 @@ static void apply_rules(struct client *c, struct monitor **mon, uint32_t *tags, 
 			c->scratch = r->scratchpad;
 		if (r->sticky >= 0)
 			c->sticky = r->sticky;
-		if (r->focus)
-			*focus = true;
+		if (r->focus >= 0)
+			*focus = r->focus;
 		if (r->tags)
 			*tags = r->tags;
 		if (r->output) {

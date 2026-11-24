@@ -515,6 +515,8 @@ static void handle_workspace_commit(struct wl_listener *l, void *data)
 {
 	struct wlr_ext_workspace_v1_commit_event *ev = data;
 	struct wlr_ext_workspace_v1_request *req;
+	if (srv.locked)
+		return;
 	wl_list_for_each(req, ev->requests, link) {
 		if (req->type != WLR_EXT_WORKSPACE_V1_REQUEST_ACTIVATE || !req->activate.workspace)
 			continue;
