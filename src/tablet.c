@@ -112,8 +112,16 @@ static void handle_tool_button(struct wl_listener *l, void *data)
 {
 	struct wlr_tablet_tool_button_event *ev = data;
 	struct wlr_tablet_v2_tablet_tool *t = tool_v2(ev->tool);
-	if (t && t->focused_surface)
+	if (!t)
+		return;
+	if (t->focused_surface) {
 		wlr_send_tablet_v2_tablet_tool_button(t, ev->button, (enum zwp_tablet_pad_v2_button_state)ev->state);
+		return;
+	}
+	uint32_t button = ev->button == BTN_STYLUS ? BTN_RIGHT : ev->button == BTN_STYLUS2 ? BTN_MIDDLE : ev->button;
+	wlr_seat_pointer_notify_button(srv.seat, ev->time_msec, button,
+		ev->state ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
+	wlr_seat_pointer_notify_frame(srv.seat);
 }
 
 void tablet_add(struct wlr_input_device *dev)

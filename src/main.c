@@ -87,16 +87,22 @@ pid_t spawn(const char *cmd)
 			if (null >= 0)
 				dup2(null, STDERR_FILENO), close(null);
 		}
-		if (fork() == 0) {
+		pid_t child = fork();
+		if (child == 0) {
 			execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
 			_exit(127);
 		}
-		_exit(0);
+		_exit(child < 0 ? 1 : 0);
 	}
 	if (pid < 0)
 		wlr_log_errno(WLR_ERROR, "fork");
-	while (pid > 0 && waitpid(pid, NULL, 0) < 0 && errno == EINTR)
+	int status = 0;
+	while (pid > 0 && waitpid(pid, &status, 0) < 0 && errno == EINTR)
 		;
+	if (pid > 0 && WIFEXITED(status) && WEXITSTATUS(status)) {
+		wlr_log(WLR_ERROR, "spawn: cannot fork for '%s'", cmd);
+		return -1;
+	}
 	return pid;
 }
 
@@ -271,10 +277,26 @@ static void gpu_handle_lost(struct wl_listener *l, void *data)
 	wlr_compositor_set_renderer(srv.compositor, r);
 
 	struct monitor *m;
-	wl_list_for_each(m, &srv.monitors, link)
-		wlr_output_init_render(m->output, a, r);
+	bool all = true;
+	wl_list_for_each(m, &srv.monitors, link) {
+		if (wlr_output_init_render(m->output, a, r))
+			continue;
+		wlr_log(WLR_ERROR, "%s: cannot render with the new renderer, disabling it", m->output->name);
+		all = false;
+		if (m->output->enabled) {
+			struct wlr_output_state st;
+			wlr_output_state_init(&st);
+			wlr_output_state_set_enabled(&st, false);
+			wlr_output_commit_state(m->output, &st);
+			wlr_output_state_finish(&st);
+		}
+	}
 	share_gpu_reset();
 
+	if (!all) {
+		wlr_log(WLR_ERROR, "keeping the lost renderer alive for outputs that still reference it");
+		return;
+	}
 	wlr_allocator_destroy(old_a);
 	wlr_renderer_destroy(old_r);
 }

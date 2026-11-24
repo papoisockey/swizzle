@@ -38,8 +38,9 @@ void overview_arrange(struct monitor *m)
 		return;
 	while (cols * cols < n)
 		cols++;
-	int rows = (n + cols - 1) / cols, gi = srv.conf.overview_gap_inner, go = srv.conf.overview_gap_outer;
+	int rows = (n + cols - 1) / cols, go = MIN(srv.conf.overview_gap_outer, MIN(m->w.width, m->w.height) / 4);
 	struct wlr_box a = {m->w.x + go, m->w.y + go, m->w.width - 2 * go, m->w.height - 2 * go};
+	int gi = MIN(srv.conf.overview_gap_inner, MIN(a.width / cols, a.height / rows) / 4);
 	int h = (a.height - gi * (rows - 1)) / rows;
 	wl_list_for_each(c, &srv.clients, link) {
 		if (c->mon != m || !client_visible(c) || c->scratch)

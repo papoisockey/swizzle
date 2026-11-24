@@ -1022,7 +1022,7 @@ void ipc_event(const char *fmt, ...)
 void ipc_client_event(const char *ev, struct client *c)
 {
 	char app[256], title[512];
-	if (!nsubscribers)
+	if (!nsubscribers || srv.locked)
 		return;
 	field(app, sizeof(app), client_app_id(c));
 	field(title, sizeof(title), client_title(c));
@@ -1032,7 +1032,7 @@ void ipc_client_event(const char *ev, struct client *c)
 void ipc_title_event(struct client *c)
 {
 	char title[512];
-	if (!nsubscribers)
+	if (!nsubscribers || srv.locked)
 		return;
 	field(title, sizeof(title), client_title(c));
 	ipc_event("title %s", title);
