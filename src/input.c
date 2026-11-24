@@ -1118,11 +1118,11 @@ static bool swipe_is_ours(void)
 {
 	if (!bindings_allowed())
 		return false;
-	if (srv.conf.gesture_fingers > 0 && srv.swipe_fingers == (uint32_t)srv.conf.gesture_fingers)
+	if (!srv.locked && srv.conf.gesture_fingers > 0 && srv.swipe_fingers == (uint32_t)srv.conf.gesture_fingers)
 		return true;
 	for (size_t i = 0; i < srv.conf.nbinds; i++)
 		if (srv.conf.binds[i].sym >= SYM_SWIPE_OF(srv.swipe_fingers, 0) &&
-				srv.conf.binds[i].sym <= SYM_SWIPE_OF(srv.swipe_fingers, 3))
+				srv.conf.binds[i].sym <= SYM_SWIPE_OF(srv.swipe_fingers, 3) && (!srv.locked || srv.conf.binds[i].locked))
 			return true;
 	return false;
 }
@@ -1161,7 +1161,7 @@ static void handle_swipe_end(struct wl_listener *l, void *data)
 	srv.swipe_fingers = 0;
 	swipe_ours = false;
 	double dx = srv.swipe_dx, dy = srv.swipe_dy, t = srv.conf.swipe_threshold;
-	if (ev->cancelled || srv.locked || !srv.selmon || (fabs(dx) < t && fabs(dy) < t))
+	if (ev->cancelled || !srv.selmon || (fabs(dx) < t && fabs(dy) < t))
 		return;
 	if (!bindings_allowed())
 		return;
@@ -1173,7 +1173,7 @@ static void handle_swipe_end(struct wl_listener *l, void *data)
 		return;
 	}
 	char err[64];
-	if (horiz && fingers == (uint32_t)srv.conf.gesture_fingers)
+	if (!srv.locked && horiz && fingers == (uint32_t)srv.conf.gesture_fingers)
 		action_run(dx < 0 ? "viewnext" : "viewprev", err, sizeof(err));
 }
 

@@ -1462,7 +1462,9 @@ void view(uint32_t tags)
 	if (!m)
 		return;
 	uint32_t old = m->tags;
-	tags &= TAGMASK;
+	if (tags && !(tags & tag_mask()))
+		return;
+	tags &= tag_mask();
 	if (!tags) {
 		if (!m->prevtags || m->prevtags == m->tags)
 			return;
@@ -1481,10 +1483,11 @@ void view(uint32_t tags)
 void toggle_view(uint32_t tags)
 {
 	struct monitor *m = srv.selmon;
-	if (!m || !(m->tags ^ (tags & TAGMASK)))
+	tags &= tag_mask();
+	if (!m || !tags || !(m->tags ^ tags))
 		return;
 	uint32_t old = m->tags;
-	m->tags ^= tags & TAGMASK;
+	m->tags ^= tags;
 	tags_switched(m, old);
 }
 
@@ -1533,14 +1536,15 @@ static void scratch_leave(struct client *c)
 
 void tag(struct client *c, uint32_t tags)
 {
-	if (!c || !(tags & TAGMASK))
+	tags &= tag_mask();
+	if (!c || !tags)
 		return;
 	bool was_focused = c == client_focused();
 	if (c->scratch)
 		scratch_leave(c);
-	if (c->tags != (tags & TAGMASK))
+	if (c->tags != tags)
 		client_leave_column(c);
-	c->tags = tags & TAGMASK;
+	c->tags = tags;
 	if (was_focused)
 		focus_top(c->mon);
 	arrange(c->mon);

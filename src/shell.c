@@ -29,8 +29,10 @@ static void update_exclusive_focus(void)
 	struct layer_surface *ls;
 	static const int order[] = {ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, ZWLR_LAYER_SHELL_V1_LAYER_TOP};
 
-	wl_list_for_each(m, &srv.monitors, link)
-		for (size_t i = 0; i < LENGTH(order) && (m->output->enabled || m->asleep); i++)
+	for (size_t i = 0; i < LENGTH(order); i++)
+		wl_list_for_each(m, &srv.monitors, link) {
+			if (!m->output->enabled && !m->asleep)
+				continue;
 			wl_list_for_each(ls, &m->layers[order[i]], link) {
 				if (!ls->mapped || ls->ls->current.keyboard_interactive != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE)
 					continue;
@@ -40,6 +42,7 @@ static void update_exclusive_focus(void)
 				}
 				return;
 			}
+		}
 	if (srv.exclusive_focus) {
 		srv.exclusive_focus = NULL;
 		focus_top(srv.selmon);
