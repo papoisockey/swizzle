@@ -498,7 +498,7 @@ static bool a_zoom(const char *arg, char *err, size_t len)
 static bool a_floating(const char *arg, char *err, size_t len)
 {
 	struct client *c = selected();
-	if (c)
+	if (c && !c->scratch)
 		client_set_floating(c, !c->floating);
 	return true;
 }

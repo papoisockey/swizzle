@@ -334,7 +334,7 @@ void client_set_floating(struct client *c, bool fl)
 {
 	if (c->fullscreen)
 		return;
-	if (!fl && c->floating)
+	if (!fl && c->floating && !c->maximized)
 		c->prev = c->geom;
 	if (fl && !c->floating)
 		client_leave_column(c);
