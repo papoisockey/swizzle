@@ -724,7 +724,7 @@ static void attach(struct client *c, struct monitor *m)
 		wl_list_for_each(o, &srv.clients, link) {
 			if (n >= m->nmaster)
 				break;
-			if (o->mon == m && !o->floating && !o->scratch && (o->tags & m->tags))
+			if (o->mon == m && client_tiled(o))
 				pos = &o->link, n++;
 		}
 	}
