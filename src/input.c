@@ -953,7 +953,11 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 {
 	locked_end_grabs();
 	if (srv.cursor_mode != CURSOR_NORMAL) {
-		if (state != WL_POINTER_BUTTON_STATE_RELEASED || (grab_button && button != grab_button))
+		if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
+			swallow(button);
+			return;
+		}
+		if (grab_button && button != grab_button)
 			return;
 		end_grab();
 		for (size_t i = 0; i < srv.seat->pointer_state.button_count; i++)

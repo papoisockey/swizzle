@@ -51,6 +51,7 @@ static struct wlr_security_context_manager_v1 *security_context;
 static const struct wl_global *privileged[32];
 static size_t nprivileged;
 static struct wl_listener renderer_lost;
+static struct wl_event_source *gpu_idle;
 static int own_fd = -1;
 
 void privileged_add(const struct wl_global *g)
@@ -250,8 +251,11 @@ static struct wlr_renderer *create_renderer(void)
 	return r;
 }
 
-static void gpu_handle_lost(struct wl_listener *l, void *data)
+static void gpu_handle_lost(struct wl_listener *l, void *data);
+
+static void gpu_recreate(void *data)
 {
+	gpu_idle = NULL;
 	wlr_log(WLR_ERROR, "GPU reset detected, recreating renderer");
 	struct wlr_renderer *old_r = srv.renderer;
 	struct wlr_allocator *old_a = srv.allocator;
@@ -301,6 +305,12 @@ static void gpu_handle_lost(struct wl_listener *l, void *data)
 	wlr_renderer_destroy(old_r);
 }
 
+static void gpu_handle_lost(struct wl_listener *l, void *data)
+{
+	if (!gpu_idle)
+		gpu_idle = wl_event_loop_add_idle(srv.loop, gpu_recreate, NULL);
+}
+
 static bool gpu_init(void)
 {
 	detect_driver();
@@ -317,6 +327,9 @@ static bool gpu_init(void)
 static void gpu_finish(void)
 {
 	wl_list_remove(&renderer_lost.link);
+	if (gpu_idle)
+		wl_event_source_remove(gpu_idle);
+	gpu_idle = NULL;
 	if (own_fd >= 0)
 		close(own_fd);
 	own_fd = -1;

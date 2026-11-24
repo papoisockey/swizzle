@@ -866,8 +866,10 @@ static void handle_popup_commit(struct wl_listener *l, void *data)
 	struct wlr_layer_surface_v1 *lsurf = p->popup->parent ? wlr_layer_surface_v1_try_from_wlr_surface(p->popup->parent) : NULL;
 	if (lsurf && lsurf->data)
 		parent = ((struct layer_surface *)lsurf->data)->popups;
-	if (!parent)
+	if (!parent) {
+		wlr_xdg_surface_schedule_configure(p->popup->base);
 		return;
+	}
 	if (!p->popup->base->surface->data) {
 		p->popup->base->surface->data = wlr_scene_xdg_surface_create(parent, p->popup->base);
 		wl_list_remove(&p->commit.link);

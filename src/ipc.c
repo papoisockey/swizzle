@@ -98,7 +98,10 @@ static bool a_spawn(const char *arg, char *err, size_t len)
 		snprintf(err, len, "spawn needs a command");
 		return false;
 	}
-	spawn(arg);
+	if (spawn(arg) < 0) {
+		snprintf(err, len, "cannot spawn '%s'", arg);
+		return false;
+	}
 	return true;
 }
 
