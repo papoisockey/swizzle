@@ -1080,8 +1080,12 @@ static void handle_touch_frame(struct wl_listener *l, void *data)
 	wlr_seat_touch_notify_frame(srv.seat);
 }
 
+static bool swipe_ours;
+
 static bool swipe_is_ours(void)
 {
+	if (!bindings_allowed())
+		return false;
 	if (srv.conf.gesture_fingers > 0 && srv.swipe_fingers == (uint32_t)srv.conf.gesture_fingers)
 		return true;
 	for (size_t i = 0; i < srv.conf.nbinds; i++)
@@ -1097,7 +1101,8 @@ static void handle_swipe_begin(struct wl_listener *l, void *data)
 	wlr_idle_notifier_v1_notify_activity(idle_notifier, srv.seat);
 	srv.swipe_fingers = ev->fingers;
 	srv.swipe_dx = srv.swipe_dy = 0;
-	if (!swipe_is_ours())
+	swipe_ours = swipe_is_ours();
+	if (!swipe_ours)
 		wlr_pointer_gestures_v1_send_swipe_begin(srv.gestures, srv.seat, ev->time_msec, ev->fingers);
 }
 
@@ -1105,7 +1110,7 @@ static void handle_swipe_update(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_swipe_update_event *ev = data;
 	wlr_idle_notifier_v1_notify_activity(idle_notifier, srv.seat);
-	if (!swipe_is_ours()) {
+	if (!swipe_ours) {
 		wlr_pointer_gestures_v1_send_swipe_update(srv.gestures, srv.seat, ev->time_msec, ev->dx, ev->dy);
 		return;
 	}
@@ -1116,12 +1121,13 @@ static void handle_swipe_update(struct wl_listener *l, void *data)
 static void handle_swipe_end(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_swipe_end_event *ev = data;
-	if (!swipe_is_ours()) {
+	if (!swipe_ours) {
 		wlr_pointer_gestures_v1_send_swipe_end(srv.gestures, srv.seat, ev->time_msec, ev->cancelled);
 		return;
 	}
 	uint32_t fingers = srv.swipe_fingers;
 	srv.swipe_fingers = 0;
+	swipe_ours = false;
 	double dx = srv.swipe_dx, dy = srv.swipe_dy, t = srv.conf.swipe_threshold;
 	if (ev->cancelled || srv.locked || !srv.selmon || (fabs(dx) < t && fabs(dy) < t))
 		return;

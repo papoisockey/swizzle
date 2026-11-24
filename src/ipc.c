@@ -849,18 +849,21 @@ static int handle_readable(int fd, uint32_t mask, void *data)
 	ic->buf[ic->len] = '\0';
 
 	char *nl;
+	bool done = false;
 	while ((nl = memchr(ic->buf, '\n', ic->len))) {
 		*nl = '\0';
 		bool keep = handle_line(ic, ic->buf);
-		if (ic->dead || (!keep && !ic->subscribed)) {
+		if (ic->dead) {
 			client_free(ic);
 			return 0;
 		}
+		if (!keep)
+			done = true;
 		size_t used = (size_t)(nl - ic->buf) + 1;
 		memmove(ic->buf, nl + 1, ic->len - used + 1);
 		ic->len -= used;
 	}
-	if (ic->len >= sizeof(ic->buf) - 1)
+	if ((done && !ic->subscribed) || ic->len >= sizeof(ic->buf) - 1)
 		client_free(ic);
 	return 0;
 }
@@ -954,6 +957,13 @@ bool ipc_init(void)
 		return false;
 	}
 	listen_src = wl_event_loop_add_fd(srv.loop, srv.ipc_fd, WL_EVENT_READABLE, handle_accept, NULL);
+	if (!listen_src) {
+		wlr_log(WLR_ERROR, "ipc: cannot watch the socket");
+		close(srv.ipc_fd);
+		unlink(addr.sun_path);
+		srv.ipc_fd = -1;
+		return false;
+	}
 	setenv("SWIZZLE_SOCKET", addr.sun_path, 1);
 	wlr_log(WLR_INFO, "ipc listening on %s", addr.sun_path);
 	return true;

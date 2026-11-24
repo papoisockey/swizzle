@@ -134,6 +134,7 @@ static void handle_layer_unmap(struct wl_listener *l, void *data)
 static void handle_layer_destroy(struct wl_listener *l, void *data)
 {
 	struct layer_surface *ls = wl_container_of(l, ls, destroy);
+	struct monitor *m = ls->mon;
 	if (srv.exclusive_focus == ls)
 		srv.exclusive_focus = NULL;
 	effects_layer_destroy(ls);
@@ -144,6 +145,8 @@ static void handle_layer_destroy(struct wl_listener *l, void *data)
 	wl_list_remove(&ls->destroy.link);
 	wlr_scene_node_destroy(&ls->popups->node);
 	free(ls);
+	if (m)
+		layer_arrange(m);
 }
 
 static void handle_new_layer_surface(struct wl_listener *l, void *data)

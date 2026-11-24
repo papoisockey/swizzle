@@ -1583,6 +1583,7 @@ void scratch_set(struct client *c, bool on)
 		return;
 	bool was_focused = c == client_focused();
 	if (on) {
+		client_leave_column(c);
 		c->scratch = true;
 		if (c->fullscreen)
 			client_set_fullscreen(c, false);

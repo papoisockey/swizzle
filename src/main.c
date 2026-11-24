@@ -10,7 +10,9 @@
 #include <unistd.h>
 #include <xf86drm.h>
 #include <wlr/config.h>
+#if WLR_HAS_GLES2_RENDERER
 #include <wlr/render/gles2.h>
+#endif
 #include <wlr/render/pixman.h>
 #ifdef WITH_SCENEFX
 #include <scenefx/render/fx_renderer/fx_renderer.h>
@@ -188,7 +190,11 @@ static struct wlr_renderer *try_renderer(enum renderer_pref pref)
 		return NULL;
 #endif
 	case RENDERER_GLES:
+#if WLR_HAS_GLES2_RENDERER
 		return wlr_gles2_renderer_create_with_drm_fd(srv.drm_fd);
+#else
+		return NULL;
+#endif
 	case RENDERER_PIXMAN:
 		return wlr_pixman_renderer_create();
 	default:
@@ -225,7 +231,11 @@ static struct wlr_renderer *create_renderer(void)
 		r = wlr_renderer_autocreate(srv.backend);
 	if (!r)
 		return NULL;
-	const char *name = wlr_renderer_is_gles2(r) ? "gles2" : wlr_renderer_is_pixman(r) ? "pixman" : "other";
+	const char *name = wlr_renderer_is_pixman(r) ? "pixman" : "other";
+#if WLR_HAS_GLES2_RENDERER
+	if (wlr_renderer_is_gles2(r))
+		name = "gles2";
+#endif
 #if WLR_HAS_VULKAN_RENDERER
 	if (wlr_renderer_is_vk(r))
 		name = "vulkan";

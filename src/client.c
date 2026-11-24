@@ -292,6 +292,8 @@ void client_set_fullscreen(struct client *c, bool fs)
 {
 	if (c->fullscreen == fs && c->mapped)
 		return;
+	if (fs && c->mapped)
+		client_leave_column(c);
 	c->fullscreen = fs;
 	if (fs)
 		c->fake_fullscreen = false;
@@ -334,6 +336,8 @@ void client_set_floating(struct client *c, bool fl)
 		return;
 	if (!fl && c->floating)
 		c->prev = c->geom;
+	if (fl && !c->floating)
+		client_leave_column(c);
 	c->floating = fl;
 	client_restack(c);
 	if (fl && c->prev.width)
@@ -498,6 +502,8 @@ void client_set_minimized(struct client *c, bool on)
 	bool was_focused = c == client_focused();
 	if (on && srv.grab_c == c)
 		input_cancel_grab();
+	if (on)
+		client_leave_column(c);
 	c->minimized = on;
 	if (c->ftl)
 		wlr_foreign_toplevel_handle_v1_set_minimized(c->ftl, on);
@@ -530,6 +536,8 @@ void client_set_maximized(struct client *c, bool on)
 {
 	if (!c || !c->mapped || c->type == CLIENT_X11_UNMANAGED || c->maximized == on || (on && c->scratch))
 		return;
+	if (on)
+		client_leave_column(c);
 	c->maximized = on;
 	if (on && c->floating && !c->fullscreen)
 		c->prev = c->geom;
