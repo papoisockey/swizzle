@@ -1270,6 +1270,10 @@ void focus_client(struct client *c, bool lift)
 	if (c->mon && layouts[c->mon->layout].arrange == scroll)
 		arrange(c->mon);
 #endif
+#ifdef WITH_VERTICAL_SCROLL
+	if (c->mon && layouts[c->mon->layout].arrange == vertical_scroll)
+		arrange(c->mon);
+#endif
 	state_changed();
 }
 

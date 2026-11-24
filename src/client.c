@@ -527,7 +527,7 @@ void client_set_maximized(struct client *c, bool on)
 	if (!c || !c->mapped || c->type == CLIENT_X11_UNMANAGED || c->maximized == on || (on && c->scratch))
 		return;
 	c->maximized = on;
-	if (on && c->floating)
+	if (on && c->floating && !c->fullscreen)
 		c->prev = c->geom;
 #ifdef XWAYLAND
 	if (c->type == CLIENT_X11)
