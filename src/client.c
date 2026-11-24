@@ -840,16 +840,23 @@ static void popup_unconstrain(struct popup *p)
 static void handle_popup_commit(struct wl_listener *l, void *data)
 {
 	struct popup *p = wl_container_of(l, p, commit);
-	if (!p->popup->base->initial_commit)
+	if (!p->popup->base->initial_commit) {
+		struct client *c = client_from_surface(p->popup->parent);
+		if (c && c->mapped)
+			effects_resize(c);
 		return;
+	}
 	struct wlr_scene_tree *parent = p->popup->parent ? p->popup->parent->data : NULL;
 	struct wlr_layer_surface_v1 *lsurf = p->popup->parent ? wlr_layer_surface_v1_try_from_wlr_surface(p->popup->parent) : NULL;
 	if (lsurf && lsurf->data)
 		parent = ((struct layer_surface *)lsurf->data)->popups;
 	if (!parent)
 		return;
-	if (!p->popup->base->surface->data)
+	if (!p->popup->base->surface->data) {
 		p->popup->base->surface->data = wlr_scene_xdg_surface_create(parent, p->popup->base);
+		wl_list_remove(&p->commit.link);
+		wl_signal_add(&p->popup->base->surface->events.commit, &p->commit);
+	}
 	popup_unconstrain(p);
 }
 
