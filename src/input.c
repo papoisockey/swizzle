@@ -78,6 +78,19 @@ static uint32_t repeat_mods;
 static xkb_keysym_t repeat_sym;
 static uint32_t swallowed[8];
 static uint32_t grab_button;
+static double press_dx, press_dy;
+static int press_nx, press_ny;
+static struct wlr_surface *press_surface;
+
+static void surface_origin(struct wlr_surface *s, int *x, int *y)
+{
+	struct client *c = client_from_surface(s);
+	struct layer_surface *ls = c ? NULL : layer_from_surface(s);
+	struct wlr_scene_node *n = c ? &c->scene->node : ls ? &ls->scene->node : NULL;
+	*x = *y = 0;
+	if (n)
+		wlr_scene_node_coords(n, x, y);
+}
 
 static struct xkb_keymap *build_keymap(void)
 {
@@ -825,6 +838,17 @@ void input_motion(uint32_t time, bool warp_only)
 		return;
 	}
 
+	struct wlr_seat_pointer_state *ps = &srv.seat->pointer_state;
+	if (ps->button_count && ps->focused_surface && ps->focused_surface == press_surface && !srv.seat->drag &&
+			ps->grab == ps->default_grab) {
+		int nx, ny;
+		surface_origin(press_surface, &nx, &ny);
+		if (time)
+			wlr_seat_pointer_notify_motion(srv.seat, time, srv.cursor->x - press_dx - (nx - press_nx),
+				srv.cursor->y - press_dy - (ny - press_ny));
+		return;
+	}
+
 	c = hover(time, &surf, &sx, &sy);
 	if (!surf && !srv.seat->drag)
 		wlr_cursor_set_xcursor(srv.cursor, srv.xcursor_mgr, "default");
@@ -1023,7 +1047,18 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 			}
 		}
 	}
+	struct wlr_seat_pointer_state *ps = &srv.seat->pointer_state;
+	bool first = state == WL_POINTER_BUTTON_STATE_PRESSED && !ps->button_count;
 	wlr_seat_pointer_notify_button(srv.seat, time, button, state);
+	if (first) {
+		press_surface = ps->focused_surface;
+		press_dx = srv.cursor->x - ps->sx;
+		press_dy = srv.cursor->y - ps->sy;
+		surface_origin(press_surface, &press_nx, &press_ny);
+	} else if (state == WL_POINTER_BUTTON_STATE_RELEASED && !ps->button_count) {
+		press_surface = NULL;
+		input_motion(0, true);
+	}
 }
 
 static void handle_button(struct wl_listener *l, void *data)

@@ -10,7 +10,8 @@
 
 static struct wl_listener tool_axis, tool_proximity, tool_tip, tool_button;
 static struct wlr_tablet_manager_v2 *tablet_mgr;
-static bool tip_swallowed;
+static bool tip_swallowed, tip_down;
+static double tip_dx, tip_dy;
 
 static struct wlr_tablet_v2_tablet_tool *tool_v2(struct wlr_tablet_tool *tool)
 {
@@ -26,6 +27,11 @@ static bool tool_motion(struct wlr_tablet *tablet, struct wlr_tablet_tool *tool,
 	double sx, sy;
 	if (!t || !tablet->data)
 		return false;
+	if (tip_down && t->focused_surface) {
+		wlr_scene_node_set_position(&srv.layers[LYR_DRAG]->node, (int)srv.cursor->x, (int)srv.cursor->y);
+		wlr_send_tablet_v2_tablet_tool_motion(t, srv.cursor->x - tip_dx, srv.cursor->y - tip_dy);
+		return true;
+	}
 	if (srv.cursor_mode != CURSOR_NORMAL) {
 		input_motion(time, false);
 		return false;
@@ -84,6 +90,7 @@ static void handle_tool_proximity(struct wl_listener *l, void *data)
 	if (!t)
 		return;
 	if (ev->state == WLR_TABLET_TOOL_PROXIMITY_OUT) {
+		tip_down = false;
 		wlr_send_tablet_v2_tablet_tool_proximity_out(t);
 		return;
 	}
@@ -105,6 +112,12 @@ static void handle_tool_tip(struct wl_listener *l, void *data)
 		tip_swallowed = false;
 		return;
 	}
+	if (!down && tip_down) {
+		tip_down = false;
+		if (t->focused_surface)
+			wlr_send_tablet_v2_tablet_tool_up(t);
+		return;
+	}
 	struct client *c = client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
 	if ((!down || srv.cursor_mode == CURSOR_NORMAL) && t->focused_surface && t->focused_surface == surf) {
 		if (down && input_overview_pick(c)) {
@@ -114,6 +127,9 @@ static void handle_tool_tip(struct wl_listener *l, void *data)
 		if (down) {
 			input_click_focus(c, surf);
 			wlr_send_tablet_v2_tablet_tool_down(t);
+			tip_down = true;
+			tip_dx = srv.cursor->x - sx;
+			tip_dy = srv.cursor->y - sy;
 		} else {
 			wlr_send_tablet_v2_tablet_tool_up(t);
 		}
