@@ -813,7 +813,8 @@ static void center_tile(struct monitor *m)
 	}
 	struct gaps g = gaps_for(m, n);
 	struct wlr_box a = usable(m, g);
-	int mw = (int)((a.width + g.h) * m->mfact) - g.h, side = (a.width - mw - 2 * g.h) / 2;
+	int mw = MAX(1, MIN((int)((a.width + g.h) * m->mfact) - g.h, a.width - 2 * g.h - 2));
+	int side = MAX(1, (a.width - mw - 2 * g.h) / 2);
 	int mx = a.x + side + g.h, rx = mx + mw + g.h, nright = (nstack + 1) / 2, nleft = nstack / 2;
 	wl_list_for_each(c, &srv.clients, link) {
 		if (!tiled(c, m))

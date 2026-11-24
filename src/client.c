@@ -654,12 +654,12 @@ static void ftl_destroy(struct client *c)
 	c->ftl = NULL;
 }
 
-static void apply_rules(struct client *c, struct monitor **mon, uint32_t *tags, bool *focus)
+static void apply_rules(struct client *c, struct monitor **mon, uint32_t *tags, int *focus)
 {
 	const char *app_id = client_app_id(c), *title = client_title(c);
 	*mon = srv.selmon;
 	*tags = 0;
-	*focus = false;
+	*focus = -1;
 	for (size_t i = 0; i < srv.conf.nrules; i++) {
 		const struct rule *r = &srv.conf.rules[i];
 		if (r->app_id && !strstr(app_id, r->app_id))
@@ -735,7 +735,7 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 {
 	struct monitor *m;
 	uint32_t tags;
-	bool rule_focus;
+	int rule_focus;
 	int bw = srv.conf.border_width + srv.conf.border_outer_width;
 
 	c->minimized = c->maximized = c->overlay = c->fake_fullscreen = c->scroll_stacked = c->urgent = false;
@@ -787,14 +787,15 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 		client_set_maximized(c, true);
 	scratch_fit(c);
 
-	if (rule_focus && m && !client_visible(c) && !srv.locked) {
+	if (rule_focus == 1 && m && !client_visible(c) && !srv.locked) {
 		srv.selmon = m;
 		view(c->tags);
 	}
 	bool child = m && client_is_child_of(c, m->fullscreen);
 	if (child)
 		wlr_scene_node_reparent(&c->scene->node, srv.layers[LYR_FS]);
-	bool may_focus = m && client_visible(c) && !srv.locked && (!m->fullscreen || c->fullscreen || c->scratch || child);
+	bool may_focus = rule_focus != 0 && m && client_visible(c) && !srv.locked &&
+		(!m->fullscreen || c->fullscreen || c->scratch || child);
 	if (may_focus && srv.exclusive_focus) {
 		struct client *old = client_last_focused();
 		if (old && old != c)
@@ -804,7 +805,7 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 		wlr_scene_node_raise_to_top(&c->scene->node);
 	} else if (may_focus)
 		focus_client(c, true);
-	else if (m)
+	else if (m && rule_focus != 0)
 		client_set_urgent(c, true);
 	arrange(m);
 	effects_map(c);
@@ -818,10 +819,12 @@ static bool column_member(struct client *c)
 
 void client_leave_column(struct client *c)
 {
+	bool shown = client_visible(c) && !c->mon->overview;
 	if (!c->scroll_stacked && !c->minimized && column_member(c) && !wl_list_empty(&c->link))
 		for (struct wl_list *it = c->link.next; it != &srv.clients; it = it->next) {
 			struct client *o = wl_container_of(it, o, link);
-			if (o->mon != c->mon || !(o->tags & c->tags) || o->minimized || !column_member(o))
+			if (o->mon != c->mon || o->minimized || !column_member(o) ||
+					!(shown ? client_visible(o) : (o->tags & c->tags) != 0))
 				continue;
 			o->scroll_stacked = false;
 			break;
@@ -837,10 +840,10 @@ static void client_unmapped(struct client *c)
 	if (srv.drop_target == c)
 		srv.drop_target = NULL;
 	effects_unmap(c);
+	client_leave_column(c);
 	c->mapped = false;
 	c->active = false;
 	ftl_destroy(c);
-	client_leave_column(c);
 	wl_list_remove(&c->link);
 	wl_list_remove(&c->flink);
 	wl_list_init(&c->link);
