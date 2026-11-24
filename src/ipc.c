@@ -867,6 +867,8 @@ static int handle_readable(int fd, uint32_t mask, void *data)
 	bool done = false;
 	while ((nl = memchr(ic->buf, '\n', ic->len))) {
 		*nl = '\0';
+		if (nl > ic->buf && nl[-1] == '\r')
+			nl[-1] = '\0';
 		bool keep = handle_line(ic, ic->buf);
 		if (ic->dead) {
 			client_free(ic);
