@@ -390,7 +390,7 @@ static void update_output_manager(void)
 void output_update_all(void)
 {
 	struct monitor *m;
-	struct client *c;
+	struct client *c, *tmp;
 
 	wl_list_for_each(m, &srv.monitors, link) {
 		if (monitor_off(m))
@@ -407,7 +407,7 @@ void output_update_all(void)
 			}
 	}
 	if (srv.selmon) {
-		wl_list_for_each(c, &srv.clients, link)
+		wl_list_for_each_safe(c, tmp, &srv.clients, link)
 			if ((!c->mon || monitor_off(c->mon)) && c->mapped)
 				client_send_to_monitor(c, srv.selmon, c->tags);
 	}

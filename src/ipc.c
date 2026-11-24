@@ -646,21 +646,32 @@ static bool a_on(const char *arg, char *err, size_t len)
 		snprintf(err, len, "'%s' cannot target a window", actions[i].name);
 		return false;
 	}
-	struct client *c, *tmp;
-	int hits = 0;
+	struct client *c, **hits;
+	size_t n = 0;
 	bool ok = true;
-	wl_list_for_each_safe(c, tmp, &srv.clients, link) {
-		if (!c->mapped || strcmp(client_app_id(c), app_id))
-			continue;
-		target = c;
-		ok = actions[i].fn(sub, err, len) && ok;
-		target = NULL;
-		hits++;
-	}
-	if (!hits) {
+	wl_list_for_each(c, &srv.clients, link)
+		if (c->mapped && !strcmp(client_app_id(c), app_id))
+			n++;
+	if (!n) {
 		snprintf(err, len, "no window with app_id '%s'", app_id);
 		return false;
 	}
+	if (!(hits = calloc(n, sizeof(*hits)))) {
+		snprintf(err, len, "out of memory");
+		return false;
+	}
+	n = 0;
+	wl_list_for_each(c, &srv.clients, link)
+		if (c->mapped && !strcmp(client_app_id(c), app_id))
+			hits[n++] = c;
+	for (size_t k = 0; k < n; k++) {
+		if (!hits[k]->mapped)
+			continue;
+		target = hits[k];
+		ok = actions[i].fn(sub, err, len) && ok;
+		target = NULL;
+	}
+	free(hits);
 	return ok;
 }
 #endif
