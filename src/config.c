@@ -369,12 +369,13 @@ static void parse_tag_names(struct config *c, const char *v, int line)
 	for (int i = 0;; i++) {
 		size_t n = strcspn(v, ",");
 		char name[128];
-		if (i == TAGCOUNT) {
-			conf_error("config:%d: more than %d tag names", line, TAGCOUNT);
-			return;
-		}
 		snprintf(name, sizeof(name), "%.*s", (int)n, v);
 		char *t = trim(name);
+		if (i == TAGCOUNT) {
+			if (*t || v[n])
+				conf_error("config:%d: more than %d tag names", line, TAGCOUNT);
+			return;
+		}
 		if (*t)
 			set_str(&c->tag_names[i], t);
 		if (!v[n])

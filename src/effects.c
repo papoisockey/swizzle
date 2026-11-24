@@ -844,10 +844,7 @@ void effects_focus(struct client *c)
 	layout_dim(fx);
 	float to = c->active ? srv.conf.opacity_focused : srv.conf.opacity_unfocused;
 	if (to == fx->alpha_to && !fx->focusing) {
-		if (fx->alpha != to)
-			fx->alpha = to;
-		else
-			return;
+		fx->alpha = to;
 	} else if (dur(DUR_FOCUS) > 0 && fx->placed) {
 		fx->alpha_from = fx->alpha;
 		fx->alpha_to = to;
