@@ -250,6 +250,7 @@ struct client {
 	} s;
 	struct wlr_scene_tree *scene;
 	struct wlr_scene_tree *scene_surface;
+	struct wlr_scene_tree *popups;
 	struct wlr_scene_rect *border[8];
 	struct wl_list link;
 	struct wl_list flink;
@@ -440,6 +441,7 @@ void input_apply_grab(void);
 void input_start_grab(struct client *c, uint32_t edges);
 void input_motion(uint32_t time, bool warp_only);
 void input_hover(uint32_t time);
+bool input_overview_pick(struct client *c);
 void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state state);
 void input_set_focus_surface(struct wlr_surface *surface);
 void input_click_focus(struct client *c, struct wlr_surface *surf);

@@ -10,6 +10,7 @@
 
 static struct wl_listener tool_axis, tool_proximity, tool_tip, tool_button;
 static struct wlr_tablet_manager_v2 *tablet_mgr;
+static bool tip_swallowed;
 
 static struct wlr_tablet_v2_tablet_tool *tool_v2(struct wlr_tablet_tool *tool)
 {
@@ -100,8 +101,16 @@ static void handle_tool_tip(struct wl_listener *l, void *data)
 	bool down = ev->state == WLR_TABLET_TOOL_TIP_DOWN;
 	if (!t)
 		return;
+	if (!down && tip_swallowed) {
+		tip_swallowed = false;
+		return;
+	}
 	struct client *c = client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
 	if ((!down || srv.cursor_mode == CURSOR_NORMAL) && t->focused_surface && t->focused_surface == surf) {
+		if (down && input_overview_pick(c)) {
+			tip_swallowed = true;
+			return;
+		}
 		if (down) {
 			input_click_focus(c, surf);
 			wlr_send_tablet_v2_tablet_tool_down(t);

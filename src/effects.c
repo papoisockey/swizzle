@@ -366,30 +366,17 @@ static void layout_dim(struct effects *fx)
 	struct wlr_buffer *b = dim_buf[c->active ? 0 : 1];
 	int bw = border_of(c), w = c->geom.width - 2 * bw, h = c->geom.height - 2 * bw;
 	bool on = b && w > 0 && h > 0 && c->type != CLIENT_X11_UNMANAGED;
-	struct wlr_scene_tree *parent = on && c->mapped && c->scene_surface ? c->scene_surface : c->scene;
-	if (fx->dim->node.parent != parent)
-		wlr_scene_node_reparent(&fx->dim->node, parent);
 	wlr_scene_node_set_enabled(&fx->dim->node, on);
 	if (!on)
 		return;
 	if (fx->dim->buffer != b)
 		wlr_scene_buffer_set_buffer(fx->dim, b);
 	wlr_scene_buffer_set_dest_size(fx->dim, w, h);
-	int off = parent == c->scene ? bw : 0;
-	wlr_scene_node_set_position(&fx->dim->node, off, off);
-	struct wlr_scene_node *first = wl_container_of(parent->children.next, first, link);
-	if (parent == c->scene_surface && c->type == CLIENT_XDG && first != &fx->dim->node)
-		wlr_scene_node_place_above(&fx->dim->node, first);
-	else if (parent != c->scene_surface || c->type != CLIENT_XDG)
+	wlr_scene_node_set_position(&fx->dim->node, bw, bw);
+	if (c->popups)
+		wlr_scene_node_place_below(&fx->dim->node, &c->popups->node);
+	else
 		wlr_scene_node_raise_to_top(&fx->dim->node);
-}
-
-static void dim_detach(struct effects *fx)
-{
-	if (fx->dim && fx->dim->node.parent != fx->c->scene)
-		wlr_scene_node_reparent(&fx->dim->node, fx->c->scene);
-	if (fx->dim)
-		wlr_scene_node_set_enabled(&fx->dim->node, false);
 }
 
 static void layout(struct effects *fx)
@@ -960,7 +947,6 @@ void effects_unmap(struct client *c)
 		out_of_output(c->geom, &dx, &dy);
 		close_copy(fx, srv.conf.anim_close, srv.conf.fade_out, dx, dy);
 	}
-	dim_detach(fx);
 	fx->surface = NULL;
 	set_opacity(fx, 1);
 }

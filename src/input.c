@@ -923,6 +923,23 @@ void input_click_focus(struct client *c, struct wlr_surface *surf)
 	}
 }
 
+bool input_overview_pick(struct client *c)
+{
+#ifdef WITH_OVERVIEW
+	if (!c || !c->mon || !c->mon->overview || srv.locked)
+		return false;
+	struct monitor *m = c->mon;
+	overview_set(m, false);
+	srv.selmon = m;
+	if (!client_visible(c))
+		view(c->tags);
+	focus_client(c, true);
+	return true;
+#else
+	return false;
+#endif
+}
+
 static void swallow(uint32_t button)
 {
 	for (size_t i = 0; i < LENGTH(swallowed); i++)
@@ -967,18 +984,10 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 			run_binding(mods, SYM_BUTTON + button, &repeat);
 			return;
 		}
-#ifdef WITH_OVERVIEW
-		if (c && c->mon && c->mon->overview && !srv.locked) {
-			struct monitor *m = c->mon;
+		if (input_overview_pick(c)) {
 			swallow(button);
-			overview_set(m, false);
-			srv.selmon = m;
-			if (!client_visible(c))
-				view(c->tags);
-			focus_client(c, true);
 			return;
 		}
-#endif
 
 		if (mods == srv.conf.mouse_mod && (button == BTN_LEFT || button == BTN_RIGHT)) {
 			input_start_grab(c, button == BTN_LEFT ? 0 : WLR_EDGE_BOTTOM | WLR_EDGE_RIGHT);

@@ -238,6 +238,8 @@ void client_resize(struct client *c, struct wlr_box geo)
 	effects_move(c, geo.x, geo.y);
 	if (c->scene_surface)
 		wlr_scene_node_set_position(&c->scene_surface->node, bw, bw);
+	if (c->popups)
+		wlr_scene_node_set_position(&c->popups->node, bw, bw);
 	if (c->border[0]) {
 		set_ring(c->border + 4, 0, ow, geo.width, geo.height);
 		set_ring(c->border, ow, bw - ow, geo.width, geo.height);
@@ -1075,7 +1077,8 @@ static void handle_new_toplevel(struct wl_listener *l, void *data)
 	c->s.xdg = t;
 	t->base->data = c;
 	c->scene_surface = wlr_scene_xdg_surface_create(c->scene, t->base);
-	t->base->surface->data = c->scene_surface;
+	c->popups = wlr_scene_tree_create(c->scene);
+	t->base->surface->data = c->popups;
 
 	LISTEN(&t->base->surface->events.commit, &c->commit, handle_xdg_commit);
 	LISTEN(&t->base->surface->events.map, &c->map, handle_xdg_map);
