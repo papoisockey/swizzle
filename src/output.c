@@ -67,10 +67,13 @@ static void build_state(struct monitor *m, struct wlr_output_state *st, bool wit
 	} else if (oc->width && (o->width != oc->width || o->height != oc->height || (refresh && o->refresh != refresh))) {
 		wlr_output_state_set_custom_mode(st, oc->width, oc->height, refresh);
 	}
-	if (oc->scale > 0 && oc->scale != o->scale)
-		wlr_output_state_set_scale(st, oc->scale);
-	if (oc->transform >= 0 && (enum wl_output_transform)oc->transform != o->transform)
-		wlr_output_state_set_transform(st, oc->transform);
+	float scale = oc->scale > 0 ? oc->scale : 1.0f;
+	if (scale != o->scale)
+		wlr_output_state_set_scale(st, scale);
+	enum wl_output_transform transform = oc->transform >= 0 ? (enum wl_output_transform)oc->transform :
+		WL_OUTPUT_TRANSFORM_NORMAL;
+	if (transform != o->transform)
+		wlr_output_state_set_transform(st, transform);
 	bool vrr = oc->vrr == VRR_ON;
 	if (with_vrr && o->adaptive_sync_supported && vrr != (o->adaptive_sync_status == WLR_OUTPUT_ADAPTIVE_SYNC_ENABLED))
 		wlr_output_state_set_adaptive_sync_enabled(st, vrr);

@@ -1090,6 +1090,7 @@ static bool swipe_is_ours(void)
 static void handle_swipe_begin(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_swipe_begin_event *ev = data;
+	wlr_idle_notifier_v1_notify_activity(idle_notifier, srv.seat);
 	srv.swipe_fingers = ev->fingers;
 	srv.swipe_dx = srv.swipe_dy = 0;
 	if (!swipe_is_ours())
@@ -1099,6 +1100,7 @@ static void handle_swipe_begin(struct wl_listener *l, void *data)
 static void handle_swipe_update(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_swipe_update_event *ev = data;
+	wlr_idle_notifier_v1_notify_activity(idle_notifier, srv.seat);
 	if (!swipe_is_ours()) {
 		wlr_pointer_gestures_v1_send_swipe_update(srv.gestures, srv.seat, ev->time_msec, ev->dx, ev->dy);
 		return;
@@ -1134,12 +1136,14 @@ static void handle_swipe_end(struct wl_listener *l, void *data)
 static void handle_pinch_begin(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_pinch_begin_event *ev = data;
+	wlr_idle_notifier_v1_notify_activity(idle_notifier, srv.seat);
 	wlr_pointer_gestures_v1_send_pinch_begin(srv.gestures, srv.seat, ev->time_msec, ev->fingers);
 }
 
 static void handle_pinch_update(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_pinch_update_event *ev = data;
+	wlr_idle_notifier_v1_notify_activity(idle_notifier, srv.seat);
 	wlr_pointer_gestures_v1_send_pinch_update(srv.gestures, srv.seat, ev->time_msec, ev->dx, ev->dy, ev->scale, ev->rotation);
 }
 
@@ -1152,6 +1156,7 @@ static void handle_pinch_end(struct wl_listener *l, void *data)
 static void handle_hold_begin(struct wl_listener *l, void *data)
 {
 	struct wlr_pointer_hold_begin_event *ev = data;
+	wlr_idle_notifier_v1_notify_activity(idle_notifier, srv.seat);
 	wlr_pointer_gestures_v1_send_hold_begin(srv.gestures, srv.seat, ev->time_msec, ev->fingers);
 }
 
