@@ -111,36 +111,52 @@ static void configure_pointer(struct wlr_input_device *dev)
 	const struct pointer_conf *b = &srv.conf.pointer, *p = touchpad ? &srv.conf.touchpad : &srv.conf.mouse;
 	int v;
 	if (touchpad) {
-		if ((v = pick(p->tap, b->tap)) >= 0)
-			libinput_device_config_tap_set_enabled(d, v ? LIBINPUT_CONFIG_TAP_ENABLED : LIBINPUT_CONFIG_TAP_DISABLED);
-		if ((v = pick(p->tap_drag, b->tap_drag)) >= 0)
-			libinput_device_config_tap_set_drag_enabled(d, v ? LIBINPUT_CONFIG_DRAG_ENABLED : LIBINPUT_CONFIG_DRAG_DISABLED);
-		if ((v = pick(p->dwt, b->dwt)) >= 0 && libinput_device_config_dwt_is_available(d))
-			libinput_device_config_dwt_set_enabled(d, v ? LIBINPUT_CONFIG_DWT_ENABLED : LIBINPUT_CONFIG_DWT_DISABLED);
-		if ((v = pick(p->drag_lock, b->drag_lock)) >= 0)
-			libinput_device_config_tap_set_drag_lock_enabled(d, v ? LIBINPUT_CONFIG_DRAG_LOCK_ENABLED :
-				LIBINPUT_CONFIG_DRAG_LOCK_DISABLED);
+		v = pick(p->tap, b->tap);
+		libinput_device_config_tap_set_enabled(d, v < 0 ? libinput_device_config_tap_get_default_enabled(d) :
+			v ? LIBINPUT_CONFIG_TAP_ENABLED : LIBINPUT_CONFIG_TAP_DISABLED);
+		v = pick(p->tap_drag, b->tap_drag);
+		libinput_device_config_tap_set_drag_enabled(d, v < 0 ? libinput_device_config_tap_get_default_drag_enabled(d) :
+			v ? LIBINPUT_CONFIG_DRAG_ENABLED : LIBINPUT_CONFIG_DRAG_DISABLED);
+		v = pick(p->dwt, b->dwt);
+		if (libinput_device_config_dwt_is_available(d))
+			libinput_device_config_dwt_set_enabled(d, v < 0 ? libinput_device_config_dwt_get_default_enabled(d) :
+				v ? LIBINPUT_CONFIG_DWT_ENABLED : LIBINPUT_CONFIG_DWT_DISABLED);
+		v = pick(p->drag_lock, b->drag_lock);
+		libinput_device_config_tap_set_drag_lock_enabled(d, v < 0 ?
+			libinput_device_config_tap_get_default_drag_lock_enabled(d) :
+			v ? LIBINPUT_CONFIG_DRAG_LOCK_ENABLED : LIBINPUT_CONFIG_DRAG_LOCK_DISABLED);
 	}
-	if ((v = pick(p->enabled, b->enabled)) >= 0)
-		libinput_device_config_send_events_set_mode(d, v ? LIBINPUT_CONFIG_SEND_EVENTS_ENABLED :
-			LIBINPUT_CONFIG_SEND_EVENTS_DISABLED);
-	if ((v = pick(p->natural_scroll, b->natural_scroll)) >= 0 && libinput_device_config_scroll_has_natural_scroll(d))
-		libinput_device_config_scroll_set_natural_scroll_enabled(d, v);
-	if ((v = pick(p->left_handed, b->left_handed)) >= 0 && libinput_device_config_left_handed_is_available(d))
-		libinput_device_config_left_handed_set(d, v);
-	if ((v = pick(p->middle_emulation, b->middle_emulation)) >= 0 && libinput_device_config_middle_emulation_is_available(d))
-		libinput_device_config_middle_emulation_set_enabled(d, v ? LIBINPUT_CONFIG_MIDDLE_EMULATION_ENABLED :
-			LIBINPUT_CONFIG_MIDDLE_EMULATION_DISABLED);
-	if ((p->has_accel || b->has_accel) && libinput_device_config_accel_is_available(d))
-		libinput_device_config_accel_set_speed(d, p->has_accel ? p->accel : b->accel);
-	if ((v = pick(p->accel_profile, b->accel_profile)) >= 0 && (libinput_device_config_accel_get_profiles(d) & (uint32_t)v))
+	v = pick(p->enabled, b->enabled);
+	libinput_device_config_send_events_set_mode(d, v < 0 ? libinput_device_config_send_events_get_default_mode(d) :
+		v ? LIBINPUT_CONFIG_SEND_EVENTS_ENABLED : LIBINPUT_CONFIG_SEND_EVENTS_DISABLED);
+	v = pick(p->natural_scroll, b->natural_scroll);
+	if (libinput_device_config_scroll_has_natural_scroll(d))
+		libinput_device_config_scroll_set_natural_scroll_enabled(d, v < 0 ?
+			libinput_device_config_scroll_get_default_natural_scroll_enabled(d) : v);
+	v = pick(p->left_handed, b->left_handed);
+	if (libinput_device_config_left_handed_is_available(d))
+		libinput_device_config_left_handed_set(d, v < 0 ? libinput_device_config_left_handed_get_default(d) : v);
+	v = pick(p->middle_emulation, b->middle_emulation);
+	if (libinput_device_config_middle_emulation_is_available(d))
+		libinput_device_config_middle_emulation_set_enabled(d, v < 0 ?
+			libinput_device_config_middle_emulation_get_default_enabled(d) :
+			v ? LIBINPUT_CONFIG_MIDDLE_EMULATION_ENABLED : LIBINPUT_CONFIG_MIDDLE_EMULATION_DISABLED);
+	if (libinput_device_config_accel_is_available(d))
+		libinput_device_config_accel_set_speed(d, p->has_accel ? p->accel : b->has_accel ? b->accel :
+			libinput_device_config_accel_get_default_speed(d));
+	v = pick(p->accel_profile, b->accel_profile);
+	if (v < 0 || !(libinput_device_config_accel_get_profiles(d) & (uint32_t)v))
+		v = libinput_device_config_accel_get_default_profile(d);
+	if (v != LIBINPUT_CONFIG_ACCEL_PROFILE_NONE)
 		libinput_device_config_accel_set_profile(d, v);
-	if ((v = pick(p->scroll_method, b->scroll_method)) >= 0 &&
-			(v == LIBINPUT_CONFIG_SCROLL_NO_SCROLL || (libinput_device_config_scroll_get_methods(d) & (uint32_t)v)))
-		libinput_device_config_scroll_set_method(d, v);
-	if ((v = pick(p->click_method, b->click_method)) >= 0 &&
-			(v == LIBINPUT_CONFIG_CLICK_METHOD_NONE || (libinput_device_config_click_get_methods(d) & (uint32_t)v)))
-		libinput_device_config_click_set_method(d, v);
+	v = pick(p->scroll_method, b->scroll_method);
+	if (v < 0 || (v != LIBINPUT_CONFIG_SCROLL_NO_SCROLL && !(libinput_device_config_scroll_get_methods(d) & (uint32_t)v)))
+		v = libinput_device_config_scroll_get_default_method(d);
+	libinput_device_config_scroll_set_method(d, v);
+	v = pick(p->click_method, b->click_method);
+	if (v < 0 || (v != LIBINPUT_CONFIG_CLICK_METHOD_NONE && !(libinput_device_config_click_get_methods(d) & (uint32_t)v)))
+		v = libinput_device_config_click_get_default_method(d);
+	libinput_device_config_click_set_method(d, v);
 }
 
 void input_map_touch(void)
@@ -810,7 +826,7 @@ void input_motion(uint32_t time, bool warp_only)
 	}
 
 	c = hover(time, &surf, &sx, &sy);
-	if (!surf && !srv.seat->drag && !warp_only)
+	if (!surf && !srv.seat->drag)
 		wlr_cursor_set_xcursor(srv.cursor, srv.xcursor_mgr, "default");
 
 	if (!surf) {
