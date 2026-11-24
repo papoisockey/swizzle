@@ -145,7 +145,7 @@ static void handle_layer_destroy(struct wl_listener *l, void *data)
 	wl_list_remove(&ls->destroy.link);
 	wlr_scene_node_destroy(&ls->popups->node);
 	free(ls);
-	if (m)
+	if (m && !m->destroying)
 		layer_arrange(m);
 }
 

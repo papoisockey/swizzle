@@ -225,6 +225,7 @@ struct monitor {
 	bool vrr_toggled;
 	bool tearing_active;
 	bool asleep;
+	bool destroying;
 	bool scratch_shown;
 	int lock_frames;
 	bool scanout_locked;

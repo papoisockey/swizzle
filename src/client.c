@@ -781,7 +781,7 @@ static bool column_member(struct client *c)
 
 void client_leave_column(struct client *c)
 {
-	if (!c->scroll_stacked && column_member(c) && !wl_list_empty(&c->link))
+	if (!c->scroll_stacked && !c->minimized && column_member(c) && !wl_list_empty(&c->link))
 		for (struct wl_list *it = c->link.next; it != &srv.clients; it = it->next) {
 			struct client *o = wl_container_of(it, o, link);
 			if (o->mon != c->mon || !(o->tags & c->tags) || o->minimized || !column_member(o))

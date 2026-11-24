@@ -261,6 +261,7 @@ static void handle_destroy(struct wl_listener *l, void *data)
 	struct monitor *m = wl_container_of(l, m, destroy);
 	struct layer_surface *ls, *tmp;
 
+	m->destroying = true;
 	for (size_t i = 0; i < LENGTH(m->layers); i++)
 		wl_list_for_each_safe(ls, tmp, &m->layers[i], link)
 			wlr_layer_surface_v1_destroy(ls->ls);
