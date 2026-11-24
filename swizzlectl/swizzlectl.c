@@ -76,7 +76,6 @@ int main(int argc, char *argv[])
 	ssize_t r;
 	bool first = true;
 	while ((r = read(fd, buf, sizeof(buf))) > 0) {
-		/* the reply to a command is one line, but it may arrive in pieces */
 		static const char tag[] = "error: ";
 		static size_t seen;
 		for (ssize_t i = 0; first && i < r; i++) {

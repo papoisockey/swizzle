@@ -1597,7 +1597,7 @@ void scratch_toggle(void)
 	bool show = !m->scratch_shown;
 	scratch_show(m, show);
 	wl_list_for_each(c, &srv.fstack, flink)
-		if (c->scratch && c->mapped && show) {
+		if (c->scratch && c->mapped && !c->minimized && show) {
 			if (c->mon != m)
 				client_send_to_monitor(c, m, c->tags);
 			scratch_fit(c);

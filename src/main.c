@@ -16,8 +16,6 @@
 #include <scenefx/render/fx_renderer/fx_renderer.h>
 #endif
 #if WLR_HAS_VULKAN_RENDERER
-/* declared here instead of including wlr/render/vulkan.h, which pulls in the
- * vulkan headers even when the vulkan renderer is never picked */
 struct wlr_renderer *wlr_vk_renderer_create_with_drm_fd(int drm_fd);
 bool wlr_renderer_is_vk(struct wlr_renderer *wlr_renderer);
 #endif
@@ -162,8 +160,6 @@ static void detect_driver(void)
 	if (!v)
 		return;
 	srv.is_nvidia = !strcmp(v->name, "nvidia-drm");
-	/* virtual machine gpus: their cursor planes often show nothing, and the
-	 * ones without 3d make gles run on llvmpipe, slower than pixman */
 	static const char *soft[] = {"vmwgfx", "vboxvideo", "qxl", "bochs", "bochs-drm", "cirrus", "simpledrm"};
 	for (size_t i = 0; i < LENGTH(soft); i++)
 		if (!strcmp(v->name, soft[i]))

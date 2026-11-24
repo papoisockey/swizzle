@@ -363,6 +363,9 @@ static void place_popup(struct ime_popup *p)
 		return;
 	struct wlr_box r = ti->current.cursor_rectangle;
 	wlr_scene_node_coords(&parent->node, &x, &y);
+	struct wlr_xdg_surface *xdg = wlr_xdg_surface_try_from_wlr_surface(ti->focused_surface);
+	if (xdg)
+		x -= xdg->geometry.x, y -= xdg->geometry.y;
 	wlr_scene_node_set_position(&p->tree->node, x + r.x, y + r.y + r.height);
 	wlr_input_popup_surface_v2_send_text_input_rectangle(p->popup, &(struct wlr_box){0, -r.height, r.width, r.height});
 }

@@ -131,8 +131,6 @@ struct client *client_at(double x, double y, struct wlr_surface **surf, double *
 {
 	double nx, ny;
 	struct wlr_scene_node *node = NULL;
-	/* top to bottom, skipping the drag icons: they sit under the cursor and
-	 * would otherwise take the pointer and the drop away from the windows */
 	for (int l = LYR_COUNT - 1; l >= 0 && !node; l--)
 		if (l != LYR_DRAG)
 			node = wlr_scene_node_at(&srv.layers[l]->node, x, y, &nx, &ny);
@@ -1090,6 +1088,13 @@ static bool x11_wants_float(struct wlr_xwayland_surface *x)
 		h->min_width == h->max_width && h->min_height == h->max_height;
 }
 
+static void handle_x11_commit(struct wl_listener *l, void *data)
+{
+	struct client *c = wl_container_of(l, c, commit);
+	if (c->mapped)
+		effects_resize(c);
+}
+
 static void handle_x11_map(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, map);
@@ -1116,6 +1121,7 @@ static void handle_x11_map(struct wl_listener *l, void *data)
 			input_set_focus_surface(x->surface);
 		return;
 	}
+	LISTEN(&x->surface->events.commit, &c->commit, handle_x11_commit);
 	c->floating = x11_wants_float(x);
 	c->fullscreen = x->fullscreen;
 	client_mapped(c, (struct wlr_box){x->x, x->y, x->width, x->height});
@@ -1131,6 +1137,7 @@ static void handle_x11_unmap(struct wl_listener *l, void *data)
 		wlr_scene_node_set_enabled(&c->scene->node, false);
 		input_motion(0, true);
 	} else {
+		wl_list_remove(&c->commit.link);
 		client_unmapped(c);
 	}
 	if (c->scene_surface)
