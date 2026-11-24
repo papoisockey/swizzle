@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,9 +67,15 @@ int main(int argc, char *argv[])
 		n += (size_t)w;
 	}
 	line[n++] = '\n';
-	if (write(fd, line, n) != (ssize_t)n) {
-		perror("swizzlectl: write");
-		return 1;
+	for (size_t off = 0; off < n;) {
+		ssize_t w = write(fd, line + off, n - off);
+		if (w < 0 && errno == EINTR)
+			continue;
+		if (w <= 0) {
+			perror("swizzlectl: write");
+			return 1;
+		}
+		off += (size_t)w;
 	}
 
 	int status = 0;

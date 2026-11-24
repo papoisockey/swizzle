@@ -230,7 +230,8 @@ static uint32_t parse_tags(const char *v)
 {
 	uint32_t tags = 0;
 	char buf[64];
-	snprintf(buf, sizeof(buf), "%s", v);
+	if (snprintf(buf, sizeof(buf), "%s", v) >= (int)sizeof(buf))
+		conf_error("config:%d: tag list '%s' is too long", cur_line, v);
 	char *save = NULL;
 	for (char *tok = strtok_r(buf, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
 		char *end;

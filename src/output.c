@@ -1483,13 +1483,16 @@ uint32_t tags_shift(int dir, bool occupied)
 	return t;
 }
 
-void tag_step(struct client *c, int dir)
+void tag_step(struct client *c, int dir, bool follow)
 {
 	if (!c || !c->mon)
 		return;
-	srv.selmon = c->mon;
-	uint32_t t = tags_shift(dir, false);
+	int count = srv.conf.tag_count, i = __builtin_ctz(c->tags & tag_mask() ? c->tags & tag_mask() : 1);
+	uint32_t t = 1u << ((i + dir + count) % count);
 	tag(c, t);
+	if (!follow)
+		return;
+	srv.selmon = c->mon;
 	view(t);
 	if (client_visible(c))
 		focus_client(c, true);

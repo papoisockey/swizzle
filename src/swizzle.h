@@ -421,7 +421,7 @@ bool client_reachable(struct client *c);
 void scroll_width(struct client *c, const char *arg);
 void scroll_stack(int dx, int dy);
 void dwindle_toggle_split(void);
-void tag_step(struct client *c, int dir);
+void tag_step(struct client *c, int dir, bool follow);
 uint32_t tags_shift(int dir, bool occupied);
 uint32_t tag_mask(void);
 void output_update_tag_names(void);

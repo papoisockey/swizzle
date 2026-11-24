@@ -273,8 +273,13 @@ static bool a_tagmon(const char *arg, char *err, size_t len)
 		client_send_to_monitor(c, m, m->tags);
 		if (!target)
 			focus_top(srv.selmon);
-		else if (focused)
+		else if (focused) {
 			srv.selmon = m;
+			if (client_visible(c))
+				focus_client(c, true);
+			else
+				focus_top(m);
+		}
 	}
 	return true;
 }
@@ -349,8 +354,9 @@ static bool a_tag(const char *arg, char *err, size_t len)
 {
 	struct client *c = selected();
 	int d = arg && (!strcmp(arg, "next") || !strcmp(arg, "prev")) ? dir_arg(arg) : 0;
+	bool follow = !target || c == client_focused();
 	if (d) {
-		tag_step(c, d);
+		tag_step(c, d, follow);
 		return true;
 	}
 	const char *word = arg ? arg + strcspn(arg, " \t") : NULL;
@@ -364,7 +370,7 @@ static bool a_tag(const char *arg, char *err, size_t len)
 	if (!t)
 		return false;
 	tag(c, t);
-	if (word && *word && c && c->mon) {
+	if (word && *word && c && c->mon && follow) {
 		srv.selmon = c->mon;
 		view(t);
 		if (client_visible(c))
@@ -415,13 +421,15 @@ static bool a_overlay(const char *arg, char *err, size_t len)
 
 static bool nudge(const char *arg, char *err, size_t len, bool resize)
 {
-	int a, b;
-	char tail;
-	if (!arg || sscanf(arg, "%d %d %c", &a, &b, &tail) != 2 || abs(a) > 10000 || abs(b) > 10000) {
+	char *e1 = NULL, *e2 = NULL;
+	long a = arg ? strtol(arg, &e1, 10) : 0, b = e1 && e1 != arg ? strtol(e1, &e2, 10) : 0;
+	while (e2 && (*e2 == ' ' || *e2 == '\t'))
+		e2++;
+	if (!e2 || e2 == e1 || *e2 || labs(a) > 10000 || labs(b) > 10000) {
 		snprintf(err, len, "%s needs two numbers of pixels such as -50 0", resize ? "resize" : "move");
 		return false;
 	}
-	client_nudge(selected(), resize ? 0 : a, resize ? 0 : b, resize ? a : 0, resize ? b : 0);
+	client_nudge(selected(), resize ? 0 : (int)a, resize ? 0 : (int)b, resize ? (int)a : 0, resize ? (int)b : 0);
 	return true;
 }
 
@@ -803,6 +811,10 @@ static void send_status(struct ipc_client *ic)
 static bool handle_line(struct ipc_client *ic, char *line)
 {
 	char err[256];
+	if (srv.locked && strcmp(line, "subscribe")) {
+		client_write(ic, "error: the screen is locked\n", 28);
+		return false;
+	}
 	if (!strcmp(line, "subscribe")) {
 		char st[IPC_BUF];
 		size_t n = format_state(st, sizeof(st));
@@ -815,10 +827,6 @@ static bool handle_line(struct ipc_client *ic, char *line)
 	}
 	if (!strcmp(line, "status")) {
 		send_status(ic);
-		return false;
-	}
-	if (srv.locked) {
-		client_write(ic, "error: the screen is locked\n", 28);
 		return false;
 	}
 	if (action_run(line, err, sizeof(err)))
