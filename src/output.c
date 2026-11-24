@@ -1627,6 +1627,8 @@ void scratch_set(struct client *c, bool on)
 		scratch_fit(c);
 		client_update_border(c);
 	} else {
+		if (c->mon && !(c->tags & c->mon->tags))
+			c->tags = c->mon->tags;
 		scratch_leave(c);
 	}
 	if (was_focused && !client_reachable(c))

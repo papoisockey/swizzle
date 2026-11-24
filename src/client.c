@@ -675,6 +675,18 @@ static void apply_rules(struct client *c, struct monitor **mon, uint32_t *tags, 
 	}
 }
 
+static struct client *client_parent(struct client *c)
+{
+	struct client *p;
+#ifdef XWAYLAND
+	if (c->type != CLIENT_XDG)
+		p = c->s.xwl->parent ? c->s.xwl->parent->data : NULL;
+	else
+#endif
+		p = c->s.xdg->parent ? c->s.xdg->parent->base->data : NULL;
+	return p && p->mapped && p->mon && p->type != CLIENT_X11_UNMANAGED ? p : NULL;
+}
+
 static bool client_wants_maximized(struct client *c)
 {
 #ifdef XWAYLAND
@@ -721,6 +733,12 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 	c->split = 0;
 	c->in_overview = false;
 	apply_rules(c, &m, &tags, &rule_focus);
+	struct client *parent = client_parent(c);
+	if (parent && !tags) {
+		m = parent->mon;
+		if (!parent->scratch && !parent->sticky)
+			tags = parent->tags;
+	}
 	if (c->scratch) {
 		c->scratch_floated = !c->floating;
 		c->floating = true;
