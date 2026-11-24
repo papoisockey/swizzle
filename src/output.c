@@ -840,9 +840,10 @@ static void dwindle(struct monitor *m)
 		if (!tiled(c, m))
 			continue;
 		struct wlr_box b = area;
+		c->split_side = c->split == 1 || (c->split == 0 && area.width >= area.height);
 		if (i < n - 1) {
 			float f = i == 0 ? m->mfact : 0.5f;
-			if (c->split == 1 || (c->split == 0 && area.width >= area.height)) {
+			if (c->split_side) {
 				b.width = (int)((area.width - g.h) * f);
 				area.x += b.width + g.h;
 				area.width -= b.width + g.h;
@@ -863,7 +864,7 @@ void dwindle_toggle_split(void)
 	struct client *c = client_focused();
 	if (!c || !tiled(c, c->mon))
 		return;
-	bool side = c->split == 1 || (c->split == 0 && c->geom.width >= c->geom.height);
+	bool side = layout_is(c->mon, "dwindle") ? c->split_side : c->split == 1 || (c->split == 0 && c->geom.width >= c->geom.height);
 	c->split = side ? 2 : 1;
 	arrange(c->mon);
 }
@@ -966,7 +967,10 @@ static void scroll_strip(struct monitor *m, bool vertical)
 		return;
 	struct gaps g = gaps_for(m, n);
 	struct wlr_box a = usable(m, g);
-	int len = vertical ? a.height : a.width, gap = vertical ? g.v : g.h, st = srv.conf.scroll_struts;
+	int len = vertical ? a.height : a.width, gap = vertical ? g.v : g.h, st = srv.conf.scroll_struts, ncols = 0;
+	wl_list_for_each(c, &srv.clients, link)
+		if (tiled(c, m) && (vertical || !c->scroll_stacked || !ncols))
+			ncols++;
 	wl_list_for_each(c, &srv.clients, link) {
 		if (!tiled(c, m))
 			continue;
@@ -974,7 +978,7 @@ static void scroll_strip(struct monitor *m, bool vertical)
 			if (head)
 				pos += size + gap;
 			head = c;
-			size = strip_size(c, len, gap, n);
+			size = strip_size(c, len, gap, ncols);
 		}
 		if (c == f)
 			fpos = pos, fsize = size;
@@ -998,7 +1002,7 @@ static void scroll_strip(struct monitor *m, bool vertical)
 			if (head)
 				pos += size + gap;
 			head = c;
-			size = strip_size(c, len, gap, n);
+			size = strip_size(c, len, gap, ncols);
 			k = 0;
 			cnt = vertical ? 1 : column_size(c);
 		}

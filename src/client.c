@@ -472,27 +472,31 @@ void client_reveal(struct client *c)
 static void handle_ftl_activate(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, ftl_activate);
-	client_reveal(c);
+	if (!srv.locked)
+		client_reveal(c);
 }
 
 static void handle_ftl_close(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, ftl_close);
-	client_close(c);
+	if (!srv.locked)
+		client_close(c);
 }
 
 static void handle_ftl_fullscreen(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, ftl_fullscreen);
 	struct wlr_foreign_toplevel_handle_v1_fullscreen_event *ev = data;
-	client_set_fullscreen(c, ev->fullscreen);
+	if (!srv.locked)
+		client_set_fullscreen(c, ev->fullscreen);
 }
 
 static void handle_ftl_minimize(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, ftl_minimize);
 	struct wlr_foreign_toplevel_handle_v1_minimized_event *ev = data;
-	client_set_minimized(c, ev->minimized);
+	if (!srv.locked)
+		client_set_minimized(c, ev->minimized);
 }
 
 void client_set_minimized(struct client *c, bool on)

@@ -272,6 +272,7 @@ struct client {
 	float scroll_width;
 	bool scroll_stacked;
 	int split;
+	bool split_side;
 	struct wlr_xdg_toplevel_decoration_v1 *deco;
 	struct wlr_foreign_toplevel_handle_v1 *ftl;
 	struct wlr_ext_foreign_toplevel_handle_v1 *ext_ftl;
