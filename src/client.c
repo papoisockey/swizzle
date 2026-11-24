@@ -299,6 +299,8 @@ void client_set_fullscreen(struct client *c, bool fs)
 	c->fullscreen = fs;
 	if (fs)
 		c->fake_fullscreen = false;
+	else
+		client_join_strip(c);
 	if (c->ftl)
 		wlr_foreign_toplevel_handle_v1_set_fullscreen(c->ftl, fs);
 #ifdef XWAYLAND
@@ -341,6 +343,8 @@ void client_set_floating(struct client *c, bool fl)
 	if (fl && !c->floating)
 		client_leave_column(c);
 	c->floating = fl;
+	if (!fl)
+		client_join_strip(c);
 	client_restack(c);
 	if (fl && c->prev.width)
 		client_resize(c, client_fit(c->prev, c->mon));
@@ -514,6 +518,8 @@ void client_set_minimized(struct client *c, bool on)
 	if (on)
 		client_leave_column(c);
 	c->minimized = on;
+	if (!on)
+		client_join_strip(c);
 	if (c->ftl)
 		wlr_foreign_toplevel_handle_v1_set_minimized(c->ftl, on);
 #ifdef XWAYLAND
@@ -548,6 +554,8 @@ void client_set_maximized(struct client *c, bool on)
 	if (on)
 		client_leave_column(c);
 	c->maximized = on;
+	if (!on)
+		client_join_strip(c);
 	if (on && c->floating && !c->fullscreen)
 		c->prev = c->geom;
 #ifdef XWAYLAND

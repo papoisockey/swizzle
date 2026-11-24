@@ -80,9 +80,10 @@ static void handle_layer_commit(struct wl_listener *l, void *data)
 	if (s->current.committed & WLR_LAYER_SURFACE_V1_STATE_LAYER) {
 		wl_list_remove(&ls->link);
 		wl_list_insert(&ls->mon->layers[s->current.layer], &ls->link);
+		bool on = ls->mon->output->enabled || ls->mon->asleep;
 		wlr_scene_node_reparent(&ls->scene->node, srv.layers[layermap[s->current.layer]]);
-		wlr_scene_node_set_enabled(&ls->scene->node, s->surface->mapped);
-		wlr_scene_node_set_enabled(&ls->popups->node, true);
+		wlr_scene_node_set_enabled(&ls->scene->node, on && s->surface->mapped);
+		wlr_scene_node_set_enabled(&ls->popups->node, on);
 	}
 	if (s->initial_commit) {
 		struct wlr_layer_surface_v1_state old = s->current;
@@ -108,6 +109,10 @@ static void handle_layer_map(struct wl_listener *l, void *data)
 	struct layer_surface *ls = wl_container_of(l, ls, map);
 	ls->mapped = true;
 	wlr_log(WLR_DEBUG, "layer surface mapped: %s", ls->ls->namespace ? ls->ls->namespace : "");
+	if (ls->mon && !ls->mon->output->enabled && !ls->mon->asleep) {
+		wlr_scene_node_set_enabled(&ls->scene->node, false);
+		return;
+	}
 	if (ls->mon)
 		layer_arrange(ls->mon);
 	effects_layer_map(ls);

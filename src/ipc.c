@@ -647,24 +647,24 @@ static bool a_on(const char *arg, char *err, size_t len)
 		return false;
 	}
 	struct client *c, **hits;
-	size_t n = 0;
+	size_t nhits = 0;
 	bool ok = true;
 	wl_list_for_each(c, &srv.clients, link)
 		if (c->mapped && !strcmp(client_app_id(c), app_id))
-			n++;
-	if (!n) {
+			nhits++;
+	if (!nhits) {
 		snprintf(err, len, "no window with app_id '%s'", app_id);
 		return false;
 	}
-	if (!(hits = calloc(n, sizeof(*hits)))) {
+	if (!(hits = calloc(nhits, sizeof(*hits)))) {
 		snprintf(err, len, "out of memory");
 		return false;
 	}
-	n = 0;
+	nhits = 0;
 	wl_list_for_each(c, &srv.clients, link)
 		if (c->mapped && !strcmp(client_app_id(c), app_id))
-			hits[n++] = c;
-	for (size_t k = 0; k < n; k++) {
+			hits[nhits++] = c;
+	for (size_t k = 0; k < nhits; k++) {
 		if (!hits[k]->mapped)
 			continue;
 		target = hits[k];

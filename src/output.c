@@ -393,7 +393,14 @@ void output_update_all(void)
 	struct client *c, *tmp;
 
 	wl_list_for_each(m, &srv.monitors, link) {
-		if (monitor_off(m))
+		bool off = monitor_off(m);
+		struct layer_surface *ls;
+		for (size_t i = 0; i < LENGTH(m->layers); i++)
+			wl_list_for_each(ls, &m->layers[i], link) {
+				wlr_scene_node_set_enabled(&ls->scene->node, !off && ls->mapped);
+				wlr_scene_node_set_enabled(&ls->popups->node, !off);
+			}
+		if (off)
 			continue;
 		wlr_output_layout_get_box(srv.output_layout, m->output, &m->m);
 		layer_arrange(m);
