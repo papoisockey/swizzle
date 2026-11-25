@@ -669,6 +669,9 @@ void input_set_focus_surface(struct wlr_surface *surface)
 	if (surface != srv.seat->keyboard_state.focused_surface &&
 			srv.seat->keyboard_state.grab != srv.seat->keyboard_state.default_grab)
 		wlr_seat_keyboard_end_grab(srv.seat);
+	struct client *active = surface && !client_from_surface(surface) ? client_last_focused() : NULL;
+	if (active && active->active)
+		client_set_active(active, false);
 	if (!surface) {
 		wlr_seat_keyboard_notify_clear_focus(srv.seat);
 	} else if (kb) {
