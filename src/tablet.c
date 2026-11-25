@@ -15,6 +15,27 @@ static uint32_t pointer_buttons[8];
 static double tip_dx, tip_dy;
 static int tip_ox, tip_oy;
 
+static uint32_t pointer_button(uint32_t button)
+{
+	return button == BTN_STYLUS ? BTN_RIGHT : button == BTN_STYLUS2 ? BTN_MIDDLE : button;
+}
+
+static void release_pointer(uint32_t time)
+{
+	bool released = tip_pointer;
+	if (tip_pointer)
+		input_button(time, BTN_LEFT, WL_POINTER_BUTTON_STATE_RELEASED);
+	tip_pointer = false;
+	for (size_t i = 0; i < LENGTH(pointer_buttons); i++)
+		if (pointer_buttons[i]) {
+			input_button(time, pointer_button(pointer_buttons[i]), WL_POINTER_BUTTON_STATE_RELEASED);
+			pointer_buttons[i] = 0;
+			released = true;
+		}
+	if (released)
+		wlr_seat_pointer_notify_frame(srv.seat);
+}
+
 static struct wlr_tablet_v2_tablet_tool *tool_v2(struct wlr_tablet_tool *tool)
 {
 	if (!tool->data)
@@ -100,6 +121,7 @@ static void handle_tool_proximity(struct wl_listener *l, void *data)
 		return;
 	if (ev->state == WLR_TABLET_TOOL_PROXIMITY_OUT) {
 		tip_down = false;
+		release_pointer(ev->time_msec);
 		wlr_send_tablet_v2_tablet_tool_proximity_out(t);
 		return;
 	}
@@ -181,8 +203,7 @@ static void handle_tool_button(struct wl_listener *l, void *data)
 		return;
 	if (!ev->state)
 		pointer_buttons[slot] = 0;
-	uint32_t button = ev->button == BTN_STYLUS ? BTN_RIGHT : ev->button == BTN_STYLUS2 ? BTN_MIDDLE : ev->button;
-	input_button(ev->time_msec, button, ev->state ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
+	input_button(ev->time_msec, pointer_button(ev->button), ev->state ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
 	wlr_seat_pointer_notify_frame(srv.seat);
 }
 

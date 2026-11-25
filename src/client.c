@@ -609,14 +609,17 @@ void client_nudge(struct client *c, int dx, int dy, int dw, int dh)
 		return;
 	if (c->maximized)
 		client_set_maximized(c, false);
+	struct wlr_box g = real_geom(c);
 	if (!c->floating) {
-		c->prev = c->geom;
+		c->prev = g;
 		client_set_floating(c, true);
-		c->geom = c->prev;
 	}
-	struct wlr_box b = {c->geom.x + dx, c->geom.y + dy, MAX(50, c->geom.width + dw), MAX(50, c->geom.height + dh)};
-	client_resize(c, b);
-	c->prev = c->geom;
+	struct wlr_box b = {g.x + dx, g.y + dy, MAX(50, g.width + dw), MAX(50, g.height + dh)};
+	if (c->in_overview)
+		c->overview_geom = b;
+	else
+		client_resize(c, b);
+	c->prev = b;
 	struct monitor *m = output_at(b.x + b.width / 2.0, b.y + b.height / 2.0);
 	if (m && m != c->mon)
 		client_send_to_monitor(c, m, m->tags);
@@ -1258,15 +1261,18 @@ static void handle_x11_configure(struct wl_listener *l, void *data)
 			wlr_scene_node_set_position(&c->scene->node, ev->x, ev->y);
 		return;
 	}
+	int bw = border_of(c);
 	if (c->floating && !c->fullscreen && !c->maximized && c != srv.grab_c) {
-		int bw = border_of(c);
-		client_resize(c, (struct wlr_box){ev->x - bw, ev->y - bw, ev->width + 2 * bw, ev->height + 2 * bw});
-		effects_settle(c);
-	} else {
-		int bw = border_of(c);
-		wlr_xwayland_surface_configure(c->s.xwl, c->geom.x + bw, c->geom.y + bw,
-			c->geom.width - 2 * bw, c->geom.height - 2 * bw);
+		struct wlr_box b = {ev->x - bw, ev->y - bw, ev->width + 2 * bw, ev->height + 2 * bw};
+		if (!c->in_overview) {
+			client_resize(c, b);
+			effects_settle(c);
+			return;
+		}
+		c->overview_geom = b;
 	}
+	wlr_xwayland_surface_configure(c->s.xwl, c->geom.x + bw, c->geom.y + bw,
+		c->geom.width - 2 * bw, c->geom.height - 2 * bw);
 }
 
 static void handle_x11_geometry(struct wl_listener *l, void *data)

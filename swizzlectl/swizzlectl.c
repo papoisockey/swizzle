@@ -62,6 +62,7 @@ int main(int argc, char *argv[])
 		int w = snprintf(line + n, sizeof(line) - n, "%s%s", i > 1 ? " " : "", argv[i]);
 		if (w < 0 || (size_t)w >= sizeof(line) - n - 1) {
 			fprintf(stderr, "swizzlectl: command too long\n");
+			close(fd);
 			return 1;
 		}
 		n += (size_t)w;
@@ -73,6 +74,7 @@ int main(int argc, char *argv[])
 			continue;
 		if (w <= 0) {
 			perror("swizzlectl: write");
+			close(fd);
 			return 1;
 		}
 		off += (size_t)w;
