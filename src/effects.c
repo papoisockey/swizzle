@@ -69,7 +69,7 @@ static uint32_t now_ms(void)
 {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (uint32_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+	return (uint32_t)ts.tv_sec * 1000u + (uint32_t)(ts.tv_nsec / 1000000);
 }
 
 static int dur(enum duration_kind k)

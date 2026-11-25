@@ -196,7 +196,9 @@ static bool a_width(const char *arg, char *err, size_t len)
 {
 	struct client *c = selected();
 	char *end = NULL;
-	if (arg && strcmp(arg, "next") && strcmp(arg, "prev") && (strtod(arg, &end), end == arg || *end)) {
+	bool step = !arg || !strcmp(arg, "next") || !strcmp(arg, "prev");
+	double w = step ? 0 : strtod(arg, &end);
+	if (!step && (end == arg || *end || !(w >= 0.1 && w <= 1))) {
 		snprintf(err, len, "width needs next, prev or a share from 0.1 to 1");
 		return false;
 	}
@@ -499,9 +501,15 @@ static bool a_toggletag(const char *arg, char *err, size_t len)
 {
 	uint32_t t = valid_tag(arg, false, err, len);
 	struct client *c = selected();
-	if (t && c)
+	if (!t)
+		return false;
+	if (c && !((c->tags ^ t) & tag_mask())) {
+		snprintf(err, len, "a window needs at least one tag");
+		return false;
+	}
+	if (c)
 		tag(c, c->tags ^ t);
-	return t != 0;
+	return true;
 }
 
 static bool a_zoom(const char *arg, char *err, size_t len)

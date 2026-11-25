@@ -1110,8 +1110,11 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 
 		entered = srv.seat->pointer_state.focused_surface;
 		input_surface_origin(entered, &entered_x, &entered_y);
-		if (!held)
+		if (!held) {
 			input_click_focus(c, surf);
+			if (surf && surf == entered && srv.seat->pointer_state.focused_surface != surf)
+				wlr_seat_pointer_notify_enter(srv.seat, surf, sx, sy);
+		}
 		if (bindings_allowed() && has_binding(mods, SYM_BUTTON + button)) {
 			swallow(button);
 			run_binding(mods, SYM_BUTTON + button, &repeat);

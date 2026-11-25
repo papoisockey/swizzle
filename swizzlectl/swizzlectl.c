@@ -40,11 +40,17 @@ int main(int argc, char *argv[])
 {
 	if (argc < 2 || !strcmp(argv[1], "-h")) {
 		fprintf(stderr, "usage: swizzlectl <command> [args...]\n"
-			"  status | subscribe | reload | quit | spawn <cmd> | view <n> | tag <n> ...\n"
-			"  layout tile|dwindle|monocle|grid|scroll|float|next|prev | width next|prev|<0.1-1>\n"
-			"  gaps on|off|toggle | swap left|right|up|down\n"
-			"  scratchpad [move] | sticky | viewnext [occupied] | viewprev [occupied]\n"
-			"  on <app_id> close|floating|fullscreen|activate|sticky|width <w>|scratchpad move|tag <n>|toggletag <n>|tagmon prev|next\n");
+			"  status | subscribe | reload | quit | spawn <cmd>\n"
+			"  view <n>|all|prev | toggleview <n> | viewnext [occupied] | viewprev [occupied]\n"
+			"  tag <n>|all|next|prev | tag <n> follow | toggletag <n> | tagmon next|prev\n"
+			"  focus next|prev|left|right|up|down | focusmon next|prev | zoom\n"
+			"  swap left|right|up|down | stack left|right|up|down | split\n"
+			"  layout <name>|next|prev | width next|prev|<0.1-1> | nmaster +N|-N | mfact +F|-F\n"
+			"  gaps on|off|toggle|+N|-N | overview [on|off|toggle]\n"
+			"  close | floating | fullscreen | fakefullscreen | maximize | minimize | restore | activate\n"
+			"  overlay | sticky | scratchpad [move] | move <dx> <dy> | resize <dw> <dh>\n"
+			"  on <app_id> close|floating|fullscreen|fakefullscreen|maximize|minimize|restore|activate|overlay|\n"
+			"    sticky|width <w>|scratchpad move|tag <n>|toggletag <n>|tagmon next|prev|move <dx> <dy>|resize <dw> <dh>\n");
 		return argc < 2;
 	}
 	for (int i = 1; i < argc; i++)

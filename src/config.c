@@ -1050,6 +1050,9 @@ bool config_load(struct config *c, const char *path)
 		config_free(c);
 		return config_load(c, NULL);
 	}
+	for (size_t i = 0; i < c->nrules; i++)
+		if (c->rules[i].tags & ~((1u << c->tag_count) - 1))
+			conf_error("config: a rule uses a tag above tag_count = %d", c->tag_count);
 	c->errors = nerrors;
 	return true;
 }
