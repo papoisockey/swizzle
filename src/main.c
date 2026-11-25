@@ -107,8 +107,6 @@ pid_t spawn(const char *cmd)
 	return pid;
 }
 
-/* Autostart programs are direct children that lead their own process group and are only reaped at exit,
- * so their PID, and with it the group ID that quit kills, cannot be reused by another process meanwhile. */
 static pid_t spawn_group(const char *cmd)
 {
 	wlr_log(WLR_INFO, "spawn: %s", cmd);

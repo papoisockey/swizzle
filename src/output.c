@@ -469,7 +469,7 @@ struct monitor *output_dir(struct monitor *from, int dir)
 void output_update_tag_names(void)
 {
 	struct monitor *m;
-	struct client *c;
+	struct client *c, *tmp;
 	uint32_t mask = tag_mask(), last = 1u << (srv.conf.tag_count - 1);
 	wl_list_for_each(c, &srv.clients, link)
 		if (!(c->tags & mask) || (c->tags & ~mask))
@@ -484,8 +484,6 @@ void output_update_tag_names(void)
 		if (m->tags != old)
 			switch_slot(m, old);
 	}
-	struct client *tmp;
-	/* client_join_strip can move c further down the list. */
 	wl_list_for_each_safe(c, tmp, &srv.clients, link)
 		if (!(c->tags & mask) || (c->tags & ~mask)) {
 			c->tags = c->tags & mask ? c->tags & mask : last;
