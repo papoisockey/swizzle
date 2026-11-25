@@ -1694,9 +1694,12 @@ void scratch_fit(struct client *c)
 void scratch_show(struct monitor *m, bool show)
 {
 	struct monitor *o;
-	wl_list_for_each(o, &srv.monitors, link)
-		o->scratch_shown = false;
 	m->scratch_shown = show;
+	wl_list_for_each(o, &srv.monitors, link)
+		if (o != m && o->scratch_shown) {
+			o->scratch_shown = false;
+			arrange(o);
+		}
 }
 
 #ifdef WITH_SCRATCHPAD
