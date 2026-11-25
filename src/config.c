@@ -332,7 +332,6 @@ static void set_defaults(struct config *c)
 	c->focus_on_activate = true;
 	c->prefer_no_csd = true;
 	c->mouse_mod = WLR_MODIFIER_LOGO;
-	c->cursor_size = 24;
 	c->scroll_width = 0.5f;
 	const float presets[] = {1.0f / 3, 0.5f, 2.0f / 3, 1.0f};
 	memcpy(c->scroll_presets, presets, sizeof(presets));

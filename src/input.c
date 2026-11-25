@@ -250,6 +250,20 @@ static char *gtk_cursor_theme(void)
 	return theme;
 }
 
+static char *original_env(const char *key)
+{
+	const char *v = config_env_original(key);
+	return v && *v ? strdup(v) : NULL;
+}
+
+static const char *env_setting(const char *key, const char *original)
+{
+	for (size_t i = 0; i < srv.conf.nenv; i++)
+		if (!strcmp(srv.conf.env[i].key, key))
+			return *srv.conf.env[i].value ? srv.conf.env[i].value : NULL;
+	return original;
+}
+
 static void numlock_on(struct wlr_keyboard *kb)
 {
 	xkb_mod_index_t num = kb->keymap ? xkb_keymap_mod_get_index(kb->keymap, XKB_MOD_NAME_NUM) : XKB_MOD_INVALID;
@@ -287,19 +301,20 @@ void input_apply_config(void)
 	wl_list_for_each(d, &srv.pointers, link)
 		configure_pointer(d->dev);
 
-	static char *env_theme;
+	static char *env_theme, *env_size;
 	static bool env_read;
 	if (!env_read) {
-		const char *env = config_env_original("XCURSOR_THEME");
-		env_theme = env && *env ? strdup(env) : NULL;
+		env_theme = original_env("XCURSOR_THEME");
+		env_size = original_env("XCURSOR_SIZE");
 		env_read = true;
 	}
-	const char *theme_env = env_theme;
-	for (size_t i = 0; i < srv.conf.nenv; i++)
-		if (!strcmp(srv.conf.env[i].key, "XCURSOR_THEME"))
-			theme_env = *srv.conf.env[i].value ? srv.conf.env[i].value : NULL;
+	const char *theme_env = env_setting("XCURSOR_THEME", env_theme), *size_env = env_setting("XCURSOR_SIZE", env_size);
 	if (!srv.conf.cursor_theme)
 		srv.conf.cursor_theme = theme_env ? strdup(theme_env) : gtk_cursor_theme();
+	if (!srv.conf.cursor_size) {
+		int n = size_env ? atoi(size_env) : 0;
+		srv.conf.cursor_size = n >= 8 && n <= 256 ? n : 24;
+	}
 	char size[16];
 	snprintf(size, sizeof(size), "%d", srv.conf.cursor_size);
 	if (srv.conf.cursor_theme) {
