@@ -1289,7 +1289,7 @@ static void handle_x11_minimize(struct wl_listener *l, void *data)
 static void handle_x11_activate(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, activate);
-	struct client *f = client_focused();
+	struct client *f = client_from_surface(srv.seat->keyboard_state.focused_surface);
 	client_request_activate(c, f && f->type != CLIENT_XDG);
 }
 

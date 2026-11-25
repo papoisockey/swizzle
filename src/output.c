@@ -1267,6 +1267,8 @@ void arrange(struct monitor *m)
 		if (vis && c->type == CLIENT_X11 && c->s.xwl->minimized)
 			wlr_xwayland_surface_set_minimized(c->s.xwl, false);
 #endif
+		if (m->overview && !c->scratch)
+			continue;
 		if (vis && c->fullscreen)
 			client_resize(c, m->m);
 		else if (vis && c->maximized)
