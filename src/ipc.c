@@ -826,6 +826,21 @@ static void send_status(struct ipc_client *ic)
 	client_write(ic, line, strlen(line));
 }
 
+static void send_current(struct ipc_client *ic)
+{
+	char line[1024], app[256], title[512];
+	struct monitor *m;
+	struct client *c = client_focused();
+	wl_list_for_each(m, &srv.monitors, link) {
+		snprintf(line, sizeof(line), "layout %s %s\n", m->output->name, layout_name(m->layout));
+		client_write(ic, line, strlen(line));
+	}
+	field(app, sizeof(app), c ? client_app_id(c) : "");
+	field(title, sizeof(title), c ? client_title(c) : "");
+	snprintf(line, sizeof(line), "focus %s\t%s\n", app, title);
+	client_write(ic, line, strlen(line));
+}
+
 static bool handle_line(struct ipc_client *ic, char *line)
 {
 	char err[256];
@@ -848,7 +863,10 @@ static bool handle_line(struct ipc_client *ic, char *line)
 		if (!ic->subscribed)
 			nsubscribers++;
 		ic->subscribed = true;
-		return client_write(ic, st, n);
+		if (!client_write(ic, st, n))
+			return false;
+		send_current(ic);
+		return true;
 	}
 	if (!strcmp(line, "status")) {
 		send_status(ic);
