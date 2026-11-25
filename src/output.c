@@ -1574,10 +1574,13 @@ void tag_step(struct client *c, int dir, bool follow)
 static void scratch_leave(struct client *c)
 {
 	c->scratch = false;
-	if (c->scratch_floated && !c->fullscreen)
+	if (c->scratch_floated && !c->fullscreen) {
 		client_set_floating(c, false);
-	else
+	} else {
+		if (c->scratch_floated)
+			c->floating = false;
 		client_restack(c);
+	}
 	c->scratch_floated = false;
 	client_update_border(c);
 }

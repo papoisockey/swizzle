@@ -1289,7 +1289,8 @@ static void handle_x11_minimize(struct wl_listener *l, void *data)
 static void handle_x11_activate(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, activate);
-	client_request_activate(c, true);
+	struct client *f = client_focused();
+	client_request_activate(c, f && f->type != CLIENT_XDG);
 }
 
 static void handle_x11_hints(struct wl_listener *l, void *data)

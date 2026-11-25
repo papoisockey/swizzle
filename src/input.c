@@ -70,6 +70,7 @@ static struct {
 	bool used;
 	int32_t id;
 	double dx, dy;
+	int ox, oy;
 } fingers[10];
 static struct wlr_idle_notifier_v1 *idle_notifier;
 static struct wlr_idle_inhibit_manager_v1 *idle_inhibit;
@@ -102,7 +103,7 @@ static double press_dx, press_dy;
 static int press_nx, press_ny;
 static struct wlr_surface *press_surface;
 
-static void surface_origin(struct wlr_surface *s, int *x, int *y)
+void input_surface_origin(struct wlr_surface *s, int *x, int *y)
 {
 	struct client *c = client_from_surface(s);
 	struct layer_surface *ls = c ? NULL : layer_from_surface(s);
@@ -892,7 +893,7 @@ void input_motion(uint32_t time, bool warp_only)
 			ps->grab == ps->default_grab &&
 			(!srv.locked || wlr_session_lock_surface_v1_try_from_wlr_surface(press_surface))) {
 		int nx, ny;
-		surface_origin(press_surface, &nx, &ny);
+		input_surface_origin(press_surface, &nx, &ny);
 		if (time)
 			wlr_seat_pointer_notify_motion(srv.seat, time, srv.cursor->x - press_dx - (nx - press_nx),
 				srv.cursor->y - press_dy - (ny - press_ny));
@@ -1082,15 +1083,17 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 		double sx, sy;
 		struct client *c = client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
 		uint32_t mods = pointer_mods();
-		bool repeat;
+		bool repeat, held = press_surface && srv.seat->pointer_state.button_count &&
+			srv.seat->pointer_state.focused_surface == press_surface;
 
-		input_click_focus(c, surf);
+		if (!held)
+			input_click_focus(c, surf);
 		if (bindings_allowed() && has_binding(mods, SYM_BUTTON + button)) {
 			swallow(button);
 			run_binding(mods, SYM_BUTTON + button, &repeat);
 			return;
 		}
-		if (input_overview_pick(c)) {
+		if (!held && input_overview_pick(c)) {
 			swallow(button);
 			return;
 		}
@@ -1110,7 +1113,7 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 		press_surface = ps->focused_surface;
 		press_dx = srv.cursor->x - ps->sx;
 		press_dy = srv.cursor->y - ps->sy;
-		surface_origin(press_surface, &press_nx, &press_ny);
+		input_surface_origin(press_surface, &press_nx, &press_ny);
 	} else if (state == WL_POINTER_BUTTON_STATE_RELEASED && !ps->button_count) {
 		press_surface = NULL;
 		input_motion(0, true);
@@ -1170,9 +1173,12 @@ static void handle_touch_down(struct wl_listener *l, void *data)
 	locked_end_grabs();
 	wlr_cursor_absolute_to_layout_coords(srv.cursor, &ev->touch->base, ev->x, ev->y, &lx, &ly);
 	struct client *c = client_at(lx, ly, &surf, &sx, &sy);
+	int ox, oy, nx, ny;
+	input_surface_origin(surf, &ox, &oy);
 	input_click_focus(c, surf);
 	if (input_overview_pick(c) || !surf)
 		return;
+	input_surface_origin(surf, &nx, &ny);
 	int old = finger(ev->touch_id);
 	if (old >= 0)
 		fingers[old].used = false;
@@ -1182,7 +1188,9 @@ static void handle_touch_down(struct wl_listener *l, void *data)
 			fingers[i].id = ev->touch_id;
 			fingers[i].dx = lx - sx;
 			fingers[i].dy = ly - sy;
-			wlr_seat_touch_notify_down(srv.seat, surf, ev->time_msec, ev->touch_id, sx, sy);
+			fingers[i].ox = ox;
+			fingers[i].oy = oy;
+			wlr_seat_touch_notify_down(srv.seat, surf, ev->time_msec, ev->touch_id, sx - (nx - ox), sy - (ny - oy));
 			return;
 		}
 }
@@ -1211,7 +1219,11 @@ static void handle_touch_motion(struct wl_listener *l, void *data)
 		wlr_seat_touch_notify_motion(srv.seat, ev->time_msec, ev->touch_id, sx, sy);
 		return;
 	}
-	wlr_seat_touch_notify_motion(srv.seat, ev->time_msec, ev->touch_id, lx - fingers[i].dx, ly - fingers[i].dy);
+	int nx = fingers[i].ox, ny = fingers[i].oy;
+	if (p && p->surface)
+		input_surface_origin(p->surface, &nx, &ny);
+	wlr_seat_touch_notify_motion(srv.seat, ev->time_msec, ev->touch_id, lx - fingers[i].dx - (nx - fingers[i].ox),
+		ly - fingers[i].dy - (ny - fingers[i].oy));
 }
 
 static void handle_touch_up(struct wl_listener *l, void *data)
