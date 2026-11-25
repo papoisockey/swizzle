@@ -848,11 +848,15 @@ static void send_current(struct ipc_client *ic)
 	char line[1024], app[256], title[512];
 	struct monitor *m;
 	struct client *c = client_focused();
+	bool fullscreen = false;
 	wl_list_for_each(m, &srv.monitors, link) {
 		snprintf(line, sizeof(line), "layout %s %s\noverview %s %d\n", m->output->name, layout_name(m->layout),
 			m->output->name, m->overview);
 		client_write(ic, line, strlen(line));
+		fullscreen = fullscreen || m->fullscreen;
 	}
+	snprintf(line, sizeof(line), "fullscreen %d\n", fullscreen);
+	client_write(ic, line, strlen(line));
 	field(app, sizeof(app), c ? client_app_id(c) : "");
 	field(title, sizeof(title), c ? client_title(c) : "");
 	snprintf(line, sizeof(line), "focus %s\t%s\n", app, title);

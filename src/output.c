@@ -483,8 +483,11 @@ void output_update_tag_names(void)
 			m->tags = last;
 		m->tags &= mask;
 		m->prevtags = m->prevtags & mask ? m->prevtags & mask : m->tags;
+		int layout = m->layout;
 		if (m->tags != old)
 			switch_slot(m, old);
+		if (m->layout != layout)
+			ipc_event("layout %s %s", m->output->name, layout_name(m->layout));
 	}
 	wl_list_for_each_safe(c, tmp, &srv.clients, link)
 		if (!(c->tags & mask) || (c->tags & ~mask)) {
@@ -1279,6 +1282,8 @@ void arrange(struct monitor *m)
 	if (!m)
 		return;
 	struct client *fs = monitor_fullscreen(m);
+	if (!fs != !m->fullscreen)
+		ipc_event("fullscreen %d", fs != NULL);
 	if (fs != m->fullscreen)
 		wlr_log(WLR_INFO, "%s: fullscreen %s %s", m->output->name, fs ? "on" : "off", fs ? client_app_id(fs) : "");
 	m->fullscreen = fs;

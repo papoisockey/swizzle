@@ -368,7 +368,6 @@ void client_set_fullscreen(struct client *c, bool fs)
 	struct client *f = client_focused();
 	if (f && f->mon == c->mon && !client_reachable(f))
 		focus_top(c->mon);
-	ipc_event("fullscreen %d", fs);
 }
 
 void client_set_floating(struct client *c, bool fl)
