@@ -183,6 +183,8 @@ void client_set_active(struct client *c, bool on)
 	if (c->type == CLIENT_X11) {
 		if (on && c->s.xwl->minimized)
 			wlr_xwayland_surface_set_minimized(c->s.xwl, false);
+		if (on)
+			wlr_xwayland_surface_restack(c->s.xwl, NULL, XCB_STACK_MODE_ABOVE);
 		wlr_xwayland_surface_activate(c->s.xwl, on);
 		return;
 	}
