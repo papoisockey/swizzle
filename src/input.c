@@ -77,7 +77,27 @@ static struct wl_event_source *repeat_timer;
 static uint32_t repeat_mods;
 static xkb_keysym_t repeat_sym;
 static uint32_t swallowed[8];
+static uint32_t consumed[WLR_KEYBOARD_KEYS_CAP];
+static size_t nconsumed;
 static uint32_t grab_button;
+
+static bool key_consumed(uint32_t keycode)
+{
+	for (size_t i = 0; i < nconsumed; i++)
+		if (consumed[i] == keycode)
+			return true;
+	return false;
+}
+
+static bool unconsume_key(uint32_t keycode)
+{
+	for (size_t i = 0; i < nconsumed; i++)
+		if (consumed[i] == keycode) {
+			consumed[i] = consumed[--nconsumed];
+			return true;
+		}
+	return false;
+}
 static double press_dx, press_dy;
 static int press_nx, press_ny;
 static struct wlr_surface *press_surface;
@@ -246,15 +266,20 @@ void input_apply_config(void)
 		km = NULL;
 	}
 	wl_event_source_timer_update(repeat_timer, 0);
+	static bool numlock_applied;
+	bool numlock = km || (srv.conf.numlock && !numlock_applied);
+	numlock_applied = srv.conf.numlock;
 	if (km) {
 		wlr_keyboard_set_keymap(&srv.kb_group->keyboard, km);
 		wl_list_for_each(d, &keyboards, link)
 			wlr_keyboard_set_keymap(wlr_keyboard_from_input_device(d->dev), km);
 		xkb_keymap_unref(km);
 	}
-	numlock_on(&srv.kb_group->keyboard);
-	wl_list_for_each(d, &keyboards, link)
-		numlock_on(wlr_keyboard_from_input_device(d->dev));
+	if (numlock) {
+		numlock_on(&srv.kb_group->keyboard);
+		wl_list_for_each(d, &keyboards, link)
+			numlock_on(wlr_keyboard_from_input_device(d->dev));
+	}
 	wlr_keyboard_set_repeat_info(&srv.kb_group->keyboard, srv.conf.repeat_rate, srv.conf.repeat_delay);
 	wl_list_for_each(d, &keyboards, link)
 		wlr_keyboard_set_repeat_info(wlr_keyboard_from_input_device(d->dev), srv.conf.repeat_rate, srv.conf.repeat_delay);
@@ -417,9 +442,14 @@ static void keyboard_key(struct wlr_keyboard *kb, struct wlr_keyboard_key_event 
 	wlr_idle_notifier_v1_notify_activity(idle_notifier, srv.seat);
 	wl_event_source_timer_update(repeat_timer, 0);
 
+	bool was_consumed = unconsume_key(ev->keycode);
+	if (ev->state == WL_KEYBOARD_KEY_STATE_RELEASED && was_consumed)
+		return;
 	if (ev->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		const xkb_keysym_t *syms;
 		bool physical = !wlr_input_device_get_virtual_keyboard(&kb->base);
+		if (nconsumed < LENGTH(consumed))
+			consumed[nconsumed++] = ev->keycode;
 		int n = xkb_state_key_get_syms(kb->xkb_state, keycode, &syms);
 		for (int i = 0; i < n; i++)
 			if (syms[i] >= XKB_KEY_XF86Switch_VT_1 && syms[i] <= XKB_KEY_XF86Switch_VT_12) {
@@ -441,6 +471,8 @@ static void keyboard_key(struct wlr_keyboard *kb, struct wlr_keyboard_key_event 
 				}
 			}
 		}
+		if (!handled)
+			unconsume_key(ev->keycode);
 	}
 	if (handled || ime_key(kb, ev))
 		return;
@@ -617,11 +649,16 @@ void input_set_focus_surface(struct wlr_surface *surface)
 	if (surface != srv.seat->keyboard_state.focused_surface &&
 			srv.seat->keyboard_state.grab != srv.seat->keyboard_state.default_grab)
 		wlr_seat_keyboard_end_grab(srv.seat);
-	if (!surface)
+	if (!surface) {
 		wlr_seat_keyboard_notify_clear_focus(srv.seat);
-	else if (kb)
-		wlr_seat_keyboard_notify_enter(srv.seat, surface, kb->keycodes, kb->num_keycodes, &kb->modifiers);
-	else
+	} else if (kb) {
+		uint32_t keys[WLR_KEYBOARD_KEYS_CAP];
+		size_t n = 0;
+		for (size_t i = 0; i < kb->num_keycodes && n < LENGTH(keys); i++)
+			if (!key_consumed(kb->keycodes[i]))
+				keys[n++] = kb->keycodes[i];
+		wlr_seat_keyboard_notify_enter(srv.seat, surface, keys, n, &kb->modifiers);
+	} else
 		wlr_seat_keyboard_notify_enter(srv.seat, surface, NULL, 0, NULL);
 	input_check_constraint();
 	ime_focus(surface);
@@ -841,6 +878,8 @@ void input_motion(uint32_t time, bool warp_only)
 	}
 
 	struct wlr_seat_pointer_state *ps = &srv.seat->pointer_state;
+	if (!ps->focused_surface)
+		press_surface = NULL;
 	if (ps->button_count && ps->focused_surface && ps->focused_surface == press_surface && !srv.seat->drag &&
 			ps->grab == ps->default_grab &&
 			(!srv.locked || wlr_session_lock_surface_v1_try_from_wlr_surface(press_surface))) {

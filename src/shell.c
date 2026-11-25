@@ -44,8 +44,11 @@ static void update_exclusive_focus(void)
 			}
 		}
 	if (srv.exclusive_focus) {
+		struct layer_surface *old = srv.exclusive_focus;
 		srv.exclusive_focus = NULL;
-		focus_top(srv.selmon);
+		if (!old->mapped || old->ls->current.keyboard_interactive != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_ON_DEMAND ||
+				srv.seat->keyboard_state.focused_surface != old->ls->surface)
+			focus_top(srv.selmon);
 	}
 }
 
@@ -207,8 +210,17 @@ static void place(struct wlr_session_lock_surface_v1 *ls)
 	struct wlr_box box;
 	struct wlr_scene_tree *tree = ls->surface->data;
 	wlr_output_layout_get_box(srv.output_layout, ls->output, &box);
-	if (!tree || wlr_box_empty(&box))
+	if (!tree)
 		return;
+	if (wlr_box_empty(&box)) {
+		int w, h;
+		wlr_scene_node_set_enabled(&tree->node, false);
+		wlr_output_effective_resolution(ls->output, &w, &h);
+		if (w > 0 && h > 0)
+			wlr_session_lock_surface_v1_configure(ls, w, h);
+		return;
+	}
+	wlr_scene_node_set_enabled(&tree->node, true);
 	wlr_scene_node_set_position(&tree->node, box.x, box.y);
 	wlr_session_lock_surface_v1_configure(ls, box.width, box.height);
 }

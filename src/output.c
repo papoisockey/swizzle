@@ -287,8 +287,10 @@ static void handle_destroy(struct wl_listener *l, void *data)
 
 	struct client *c;
 	wl_list_for_each(c, &srv.clients, link)
-		if (c->mon == m)
+		if (c->mon == m) {
 			c->mon = NULL;
+			c->scroll_stacked = false;
+		}
 	free(m);
 	output_update_all();
 }

@@ -172,6 +172,8 @@ static void handle_tool_button(struct wl_listener *l, void *data)
 		for (size_t i = 0; i < LENGTH(pointer_buttons) && slot == LENGTH(pointer_buttons); i++)
 			if (!pointer_buttons[i])
 				pointer_buttons[slot = i] = ev->button;
+	if (slot == LENGTH(pointer_buttons))
+		return;
 	if (!ev->state)
 		pointer_buttons[slot] = 0;
 	uint32_t button = ev->button == BTN_STYLUS ? BTN_RIGHT : ev->button == BTN_STYLUS2 ? BTN_MIDDLE : ev->button;
