@@ -517,6 +517,7 @@ bool ipc_init(void);
 void ipc_finish(void);
 void ipc_event(const char *fmt, ...);
 void ipc_notify_state(void);
+void ipc_resync(void);
 void ipc_client_event(const char *ev, struct client *c);
 void ipc_title_event(struct client *c);
 

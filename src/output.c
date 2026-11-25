@@ -365,6 +365,8 @@ static void handle_new_output(struct wl_listener *l, void *data)
 	wlr_log(WLR_INFO, "%s: %dx%d@%.3f vrr=%s", o->name, o->width, o->height, o->refresh / 1000.0,
 		o->adaptive_sync_supported ? "supported" : "unsupported");
 	output_update_all();
+	ipc_event("layout %s %s", o->name, layout_name(m->layout));
+	ipc_event("overview %s %d", o->name, m->overview);
 }
 
 static void handle_layout_change(struct wl_listener *l, void *data)

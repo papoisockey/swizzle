@@ -297,6 +297,7 @@ void lock_frame(struct monitor *m)
 static void handle_unlock(struct wl_listener *l, void *data)
 {
 	srv.locked = false;
+	ipc_resync();
 	wlr_scene_node_set_enabled(&srv.layers[LYR_LOCK]->node, false);
 	if (srv.exclusive_focus)
 		input_set_focus_surface(srv.exclusive_focus->ls->surface);

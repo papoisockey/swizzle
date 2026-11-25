@@ -1103,6 +1103,17 @@ void ipc_title_event(struct client *c)
 	ipc_event("title %s", title);
 }
 
+void ipc_resync(void)
+{
+	struct ipc_client *ic;
+	if (srv.ipc_fd < 0)
+		return;
+	last_state[0] = '\0';
+	wl_list_for_each(ic, &ipc_clients, link)
+		if (ic->subscribed)
+			ic->needs_current = true;
+}
+
 void ipc_notify_state(void)
 {
 	char st[IPC_BUF];
