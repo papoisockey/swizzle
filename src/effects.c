@@ -1054,6 +1054,10 @@ void effects_frame(void)
 {
 	struct effects *fx, *tmp;
 	struct snapshot *s, *stmp;
+	struct client *c;
+	wl_list_for_each(c, &srv.clients, link)
+		if (c->fx && c->fx->placed && c->scene->node.enabled && opacity_of(c->fx) < 1.0f)
+			set_opacity(c->fx, opacity_of(c->fx));
 	if (wl_list_empty(&active) && wl_list_empty(&snapshots))
 		return;
 	uint32_t now = now_ms();

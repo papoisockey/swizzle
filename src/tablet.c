@@ -133,11 +133,11 @@ static void handle_tool_tip(struct wl_listener *l, void *data)
 	}
 	struct client *c = client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
 	if (srv.cursor_mode == CURSOR_NORMAL && t->focused_surface && t->focused_surface == surf) {
+		input_click_focus(c, surf);
 		if (input_overview_pick(c)) {
 			tip_swallowed = true;
 			return;
 		}
-		input_click_focus(c, surf);
 		wlr_send_tablet_v2_tablet_tool_down(t);
 		tip_down = true;
 		tip_dx = srv.cursor->x - sx;

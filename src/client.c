@@ -290,6 +290,11 @@ void client_restack(struct client *c)
 
 static bool client_is_child_of(struct client *c, struct client *parent);
 
+static struct wlr_box real_geom(struct client *c)
+{
+	return c->in_overview ? c->overview_geom : c->geom;
+}
+
 void client_set_fullscreen(struct client *c, bool fs)
 {
 	if (c->fullscreen == fs && c->mapped)
@@ -322,7 +327,7 @@ void client_set_fullscreen(struct client *c, bool fs)
 		return;
 	if (fs) {
 		if (c->floating && !c->maximized)
-			c->prev = c->geom;
+			c->prev = real_geom(c);
 		client_resize(c, c->mon->m);
 	} else if (c->floating) {
 		client_resize(c, client_fit(c->prev, c->mon));
@@ -339,7 +344,7 @@ void client_set_floating(struct client *c, bool fl)
 	if (c->fullscreen)
 		return;
 	if (!fl && c->floating && !c->maximized)
-		c->prev = c->geom;
+		c->prev = real_geom(c);
 	if (fl && !c->floating)
 		client_leave_column(c);
 	c->floating = fl;
@@ -557,7 +562,7 @@ void client_set_maximized(struct client *c, bool on)
 	if (!on)
 		client_join_strip(c);
 	if (on && c->floating && !c->fullscreen)
-		c->prev = c->geom;
+		c->prev = real_geom(c);
 #ifdef XWAYLAND
 	if (c->type == CLIENT_X11)
 		wlr_xwayland_surface_set_maximized(c->s.xwl, on, on);

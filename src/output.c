@@ -1052,7 +1052,7 @@ static void vertical_scroll(struct monitor *m)
 }
 #endif
 
-static void swap_slots(struct client *a, struct client *b)
+static void swap_flags(struct client *a, struct client *b)
 {
 	bool s = a->scroll_stacked;
 	if (s != b->scroll_stacked && !strip_vertical(a->mon)) {
@@ -1062,6 +1062,11 @@ static void swap_slots(struct client *a, struct client *b)
 	}
 	a->scroll_stacked = b->scroll_stacked;
 	b->scroll_stacked = s;
+}
+
+static void swap_slots(struct client *a, struct client *b)
+{
+	swap_flags(a, b);
 	list_swap(&a->link, &b->link);
 }
 
@@ -1098,7 +1103,9 @@ void scroll_stack(int dx, int dy)
 		struct client *o = dy < 0 ? (sel->scroll_stacked ? prev : NULL) : (next && next->scroll_stacked ? next : NULL);
 		if (!o)
 			return;
-		swap_slots(sel, o);
+		swap_flags(sel, o);
+		wl_list_remove(&sel->link);
+		wl_list_insert(dy < 0 ? o->link.prev : &o->link, &sel->link);
 	} else if (in_column) {
 		struct client *head = sel;
 		while (head->scroll_stacked && tiled_neighbor(head, -1))
@@ -1116,6 +1123,8 @@ void scroll_stack(int dx, int dy)
 		else
 			wl_list_insert(last == sel ? &prev->link : &last->link, &sel->link);
 	} else if (dx < 0 && prev) {
+		wl_list_remove(&sel->link);
+		wl_list_insert(&prev->link, &sel->link);
 		sel->scroll_stacked = true;
 	} else if (dx > 0 && next) {
 		struct client *last = column_last(next);
@@ -1345,11 +1354,11 @@ void focus_client(struct client *c, bool lift)
 	input_set_focus_surface(client_surface(c));
 	ipc_client_event("focus", c);
 #ifdef WITH_SCROLL
-	if (c->mon && layouts[c->mon->layout].arrange == scroll)
+	if (lift && c->mon && layouts[c->mon->layout].arrange == scroll)
 		arrange(c->mon);
 #endif
 #ifdef WITH_VERTICAL_SCROLL
-	if (c->mon && layouts[c->mon->layout].arrange == vertical_scroll)
+	if (lift && c->mon && layouts[c->mon->layout].arrange == vertical_scroll)
 		arrange(c->mon);
 #endif
 	state_changed();

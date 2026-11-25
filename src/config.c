@@ -1151,6 +1151,12 @@ static struct env_var *orig_of(const char *key)
 	return NULL;
 }
 
+const char *config_env_original(const char *key)
+{
+	const struct env_var *o = orig_of(key);
+	return o ? o->value : getenv(key);
+}
+
 static void remember_env(const char *key)
 {
 	if (orig_of(key))

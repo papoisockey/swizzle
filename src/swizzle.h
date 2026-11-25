@@ -505,6 +505,7 @@ void config_output(const char *name, struct output_conf *out);
 void config_layer(const char *namespace, struct layer_rule *out);
 float curve_ease(const struct curve *c, float t);
 void config_apply_env(const struct config *old, const struct config *conf);
+const char *config_env_original(const char *key);
 
 bool action_run(const char *cmd, char *err, size_t errlen);
 bool action_known(const char *cmd);

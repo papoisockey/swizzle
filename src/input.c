@@ -289,12 +289,16 @@ void input_apply_config(void)
 	static char *env_theme;
 	static bool env_read;
 	if (!env_read) {
-		const char *env = getenv("XCURSOR_THEME");
+		const char *env = config_env_original("XCURSOR_THEME");
 		env_theme = env && *env ? strdup(env) : NULL;
 		env_read = true;
 	}
+	const char *theme_env = env_theme;
+	for (size_t i = 0; i < srv.conf.nenv; i++)
+		if (!strcmp(srv.conf.env[i].key, "XCURSOR_THEME"))
+			theme_env = *srv.conf.env[i].value ? srv.conf.env[i].value : NULL;
 	if (!srv.conf.cursor_theme)
-		srv.conf.cursor_theme = env_theme ? strdup(env_theme) : gtk_cursor_theme();
+		srv.conf.cursor_theme = theme_env ? strdup(theme_env) : gtk_cursor_theme();
 	char size[16];
 	snprintf(size, sizeof(size), "%d", srv.conf.cursor_size);
 	if (srv.conf.cursor_theme) {
@@ -800,6 +804,10 @@ static void snap(struct wlr_box *b, struct client *c)
 		wl_list_for_each(o, &srv.clients, link) {
 			if (o == c || o->mon != m || !client_visible(o))
 				continue;
+			int blo = axis ? b->x : b->y, bhi = blo + (axis ? b->width : b->height);
+			int plo = axis ? o->geom.x : o->geom.y, phi = plo + (axis ? o->geom.width : o->geom.height);
+			if (phi < blo - d || plo > bhi + d)
+				continue;
 			int olo = axis ? o->geom.y : o->geom.x, ohi = olo + (axis ? o->geom.height : o->geom.width);
 			int a = olo - hi, bb = ohi - lo;
 			if (abs(a) < abs(best[axis]))
@@ -1163,7 +1171,7 @@ static void handle_touch_down(struct wl_listener *l, void *data)
 	wlr_cursor_absolute_to_layout_coords(srv.cursor, &ev->touch->base, ev->x, ev->y, &lx, &ly);
 	struct client *c = client_at(lx, ly, &surf, &sx, &sy);
 	input_click_focus(c, surf);
-	if (!surf || input_overview_pick(c))
+	if (input_overview_pick(c) || !surf)
 		return;
 	int old = finger(ev->touch_id);
 	if (old >= 0)
