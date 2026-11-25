@@ -471,6 +471,9 @@ void output_update_tag_names(void)
 	struct monitor *m;
 	struct client *c;
 	uint32_t mask = tag_mask(), last = 1u << (srv.conf.tag_count - 1);
+	wl_list_for_each(c, &srv.clients, link)
+		if (!(c->tags & mask) || (c->tags & ~mask))
+			client_leave_column(c);
 	wl_list_for_each(m, &srv.monitors, link) {
 		uint32_t old = m->tags;
 		update_workspace_handles(m);
@@ -481,9 +484,13 @@ void output_update_tag_names(void)
 		if (m->tags != old)
 			switch_slot(m, old);
 	}
-	wl_list_for_each(c, &srv.clients, link)
-		if (!(c->tags & mask) || (c->tags & ~mask))
+	struct client *tmp;
+	/* client_join_strip can move c further down the list. */
+	wl_list_for_each_safe(c, tmp, &srv.clients, link)
+		if (!(c->tags & mask) || (c->tags & ~mask)) {
 			c->tags = c->tags & mask ? c->tags & mask : last;
+			client_join_strip(c);
+		}
 }
 
 void output_update_root(void)

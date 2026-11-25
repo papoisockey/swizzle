@@ -107,6 +107,31 @@ pid_t spawn(const char *cmd)
 	return pid;
 }
 
+/* Autostart programs are direct children that lead their own process group and are only reaped at exit,
+ * so their PID, and with it the group ID that quit kills, cannot be reused by another process meanwhile. */
+static pid_t spawn_group(const char *cmd)
+{
+	wlr_log(WLR_INFO, "spawn: %s", cmd);
+	pid_t pid = fork();
+	if (pid == 0) {
+		sigset_t set;
+		sigemptyset(&set);
+		sigprocmask(SIG_SETMASK, &set, NULL);
+		signal(SIGPIPE, SIG_DFL);
+		setsid();
+		if (log_to_file) {
+			int null = open("/dev/null", O_WRONLY);
+			if (null >= 0)
+				dup2(null, STDERR_FILENO), close(null);
+		}
+		execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+		_exit(127);
+	}
+	if (pid < 0)
+		wlr_log_errno(WLR_ERROR, "fork");
+	return pid;
+}
+
 void quit(void)
 {
 	wl_display_terminate(srv.display);
@@ -615,7 +640,7 @@ int main(int argc, char *argv[])
 	pid_t *autostart = calloc(srv.conf.nautostart ? srv.conf.nautostart : 1, sizeof(*autostart));
 	size_t nautostart = srv.conf.nautostart;
 	for (size_t i = 0; i < nautostart; i++) {
-		pid_t pg = spawn(srv.conf.autostart[i]);
+		pid_t pg = spawn_group(srv.conf.autostart[i]);
 		if (autostart)
 			autostart[i] = pg;
 	}
@@ -624,8 +649,10 @@ int main(int argc, char *argv[])
 	wl_display_run(srv.display);
 
 	for (size_t i = 0; autostart && i < nautostart; i++)
-		if (autostart[i] > 0)
+		if (autostart[i] > 0) {
 			kill(-autostart[i], SIGTERM);
+			waitpid(autostart[i], NULL, WNOHANG);
+		}
 	free(autostart);
 	ipc_finish();
 	wl_event_source_remove(sigint);

@@ -217,9 +217,14 @@ static bool a_sticky(const char *arg, char *err, size_t len)
 	if (!c)
 		return true;
 	bool was_focused = c == client_focused();
+	bool retag = c->sticky && c->mon && !(c->tags & c->mon->tags);
+	if (retag)
+		client_leave_column(c);
 	c->sticky = !c->sticky;
-	if (!c->sticky && c->mon && !(c->tags & c->mon->tags))
+	if (retag) {
 		c->tags = c->mon->tags;
+		client_join_strip(c);
+	}
 	client_update_border(c);
 	arrange(c->mon);
 	if (was_focused && !client_reachable(c))
@@ -435,7 +440,7 @@ static bool nudge(const char *arg, char *err, size_t len, bool resize)
 	long a = arg ? strtol(arg, &e1, 10) : 0, b = e1 && e1 != arg ? strtol(e1, &e2, 10) : 0;
 	while (e2 && (*e2 == ' ' || *e2 == '\t'))
 		e2++;
-	if (!e2 || e2 == e1 || *e2 || labs(a) > 10000 || labs(b) > 10000) {
+	if (!e2 || e2 == e1 || *e2 || a < -10000 || a > 10000 || b < -10000 || b > 10000) {
 		snprintf(err, len, "%s needs two numbers of pixels such as -50 0", resize ? "resize" : "move");
 		return false;
 	}
@@ -724,6 +729,7 @@ struct ipc_client {
 	char buf[IPC_BUF];
 	size_t len;
 	bool subscribed;
+	bool needs_current;
 	bool dead;
 };
 
@@ -858,6 +864,7 @@ static bool handle_line(struct ipc_client *ic, char *line)
 			if (!ic->subscribed)
 				nsubscribers++;
 			ic->subscribed = true;
+			ic->needs_current = true;
 			last_state[0] = '\0';
 			return true;
 		}
@@ -867,6 +874,7 @@ static bool handle_line(struct ipc_client *ic, char *line)
 		if (!ic->subscribed)
 			nsubscribers++;
 		ic->subscribed = true;
+		ic->needs_current = false;
 		if (!client_write(ic, st, n))
 			return false;
 		send_current(ic);
@@ -1093,8 +1101,14 @@ void ipc_notify_state(void)
 	if (!nsubscribers || srv.locked)
 		return;
 	size_t n = format_state(st, sizeof(st));
-	if (!strcmp(st, last_state))
-		return;
-	memcpy(last_state, st, n + 1);
-	broadcast(st, n);
+	if (strcmp(st, last_state)) {
+		memcpy(last_state, st, n + 1);
+		broadcast(st, n);
+	}
+	struct ipc_client *ic;
+	wl_list_for_each(ic, &ipc_clients, link)
+		if (ic->needs_current) {
+			ic->needs_current = false;
+			send_current(ic);
+		}
 }

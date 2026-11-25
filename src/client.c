@@ -893,7 +893,7 @@ static void client_unmapped(struct client *c)
 	wl_list_init(&c->flink);
 	wlr_scene_node_set_enabled(&c->scene->node, false);
 	if (was_focused)
-		focus_top(srv.selmon);
+		focus_top(c->mon ? c->mon : srv.selmon);
 	arrange(c->mon);
 	c->mon = NULL;
 	input_motion(0, true);
