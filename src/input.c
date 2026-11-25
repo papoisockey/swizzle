@@ -1095,6 +1095,8 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 			swallowed[i] = 0;
 			return;
 		}
+	struct wlr_surface *entered = NULL;
+	int entered_x = 0, entered_y = 0;
 	if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
 		for (size_t i = 0; i < LENGTH(swallowed); i++)
 			if (swallowed[i] == button)
@@ -1106,6 +1108,8 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 		bool repeat, held = press_surface && srv.seat->pointer_state.button_count &&
 			srv.seat->pointer_state.focused_surface == press_surface;
 
+		entered = srv.seat->pointer_state.focused_surface;
+		input_surface_origin(entered, &entered_x, &entered_y);
 		if (!held)
 			input_click_focus(c, surf);
 		if (bindings_allowed() && has_binding(mods, SYM_BUTTON + button)) {
@@ -1133,7 +1137,10 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 		press_surface = ps->focused_surface;
 		press_dx = srv.cursor->x - ps->sx;
 		press_dy = srv.cursor->y - ps->sy;
-		input_surface_origin(press_surface, &press_nx, &press_ny);
+		if (press_surface == entered)
+			press_nx = entered_x, press_ny = entered_y;
+		else
+			input_surface_origin(press_surface, &press_nx, &press_ny);
 	} else if (state == WL_POINTER_BUTTON_STATE_RELEASED && !ps->button_count) {
 		press_surface = NULL;
 		input_motion(0, true);

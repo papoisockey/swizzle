@@ -1708,12 +1708,23 @@ void scratch_show(struct monitor *m, bool show)
 }
 
 #ifdef WITH_SCRATCHPAD
+static bool scratch_any(struct monitor *m, struct client *skip)
+{
+	struct client *c;
+	wl_list_for_each(c, &srv.clients, link)
+		if (c != skip && c->scratch && !c->minimized && (!m || c->mon == m))
+			return true;
+	return false;
+}
+
 void scratch_set(struct client *c, bool on)
 {
 	if (!c || c->scratch == on)
 		return;
 	bool was_focused = c == client_focused();
 	if (on) {
+		if (c->mon && c->mon->scratch_shown && !scratch_any(c->mon, c))
+			c->mon->scratch_shown = false;
 		client_leave_column(c);
 		c->scratch = true;
 		if (c->fullscreen)
@@ -1743,6 +1754,8 @@ void scratch_toggle(void)
 	if (!m)
 		return;
 	bool show = !m->scratch_shown;
+	if (show && !scratch_any(NULL, NULL))
+		return;
 	scratch_show(m, show);
 	wl_list_for_each(c, &srv.fstack, flink)
 		if (c->scratch && c->mapped && !c->minimized && show) {
