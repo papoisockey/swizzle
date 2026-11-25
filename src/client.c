@@ -307,6 +307,14 @@ static struct wlr_box real_geom(struct client *c)
 	return c->in_overview ? c->overview_geom : c->geom;
 }
 
+static void place_floating(struct client *c, struct wlr_box b)
+{
+	if (c->in_overview)
+		c->overview_geom = b;
+	else
+		client_resize(c, b);
+}
+
 void client_set_fullscreen(struct client *c, bool fs)
 {
 	if (c->fullscreen == fs && c->mapped)
@@ -342,7 +350,7 @@ void client_set_fullscreen(struct client *c, bool fs)
 			c->prev = real_geom(c);
 		client_resize(c, c->mon->m);
 	} else if (c->floating) {
-		client_resize(c, client_fit(c->prev, c->mon));
+		place_floating(c, client_fit(c->prev, c->mon));
 	}
 	arrange(c->mon);
 	struct client *f = client_focused();
@@ -364,7 +372,7 @@ void client_set_floating(struct client *c, bool fl)
 		client_join_strip(c);
 	client_restack(c);
 	if (fl && c->prev.width)
-		client_resize(c, client_fit(c->prev, c->mon));
+		place_floating(c, client_fit(c->prev, c->mon));
 	arrange(c->mon);
 }
 
@@ -434,6 +442,9 @@ void client_send_to_monitor(struct client *c, struct monitor *m, uint32_t tags)
 		if (restored)
 			c->geom = c->overview_geom;
 	}
+	struct wlr_box *real = &c->overview_geom;
+	if (c->in_overview && old && !wlr_box_contains_point(&m->m, real->x + real->width / 2, real->y + real->height / 2))
+		real->x += m->w.x - old->w.x, real->y += m->w.y - old->w.y;
 	int cx = c->geom.x + c->geom.width / 2, cy = c->geom.y + c->geom.height / 2;
 	if (c->floating && !wlr_box_contains_point(&m->m, cx, cy)) {
 		c->geom.x = old ? m->w.x + (c->geom.x - old->w.x) : m->w.x + (m->w.width - c->geom.width) / 2;
@@ -583,7 +594,7 @@ void client_set_maximized(struct client *c, bool on)
 		wlr_xdg_toplevel_set_maximized(c->s.xdg, on);
 	client_restack(c);
 	if (!on && c->floating && !c->fullscreen)
-		client_resize(c, client_fit(c->prev, c->mon));
+		place_floating(c, client_fit(c->prev, c->mon));
 	if (c->ftl)
 		wlr_foreign_toplevel_handle_v1_set_maximized(c->ftl, on);
 	client_update_border(c);
@@ -627,10 +638,7 @@ void client_nudge(struct client *c, int dx, int dy, int dw, int dh)
 		client_set_floating(c, true);
 	}
 	struct wlr_box b = {g.x + dx, g.y + dy, MAX(50, g.width + dw), MAX(50, g.height + dh)};
-	if (c->in_overview)
-		c->overview_geom = b;
-	else
-		client_resize(c, b);
+	place_floating(c, b);
 	c->prev = b;
 	struct monitor *m = output_at(b.x + b.width / 2.0, b.y + b.height / 2.0);
 	if (m && m != c->mon)

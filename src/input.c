@@ -709,7 +709,7 @@ static void grab_to(struct client *c, struct wlr_box box)
 void input_start_grab(struct client *c, uint32_t edges)
 {
 	if (!c || !c->mapped || c->fullscreen || c->type == CLIENT_X11_UNMANAGED || srv.locked ||
-			srv.cursor_mode != CURSOR_NORMAL)
+			srv.cursor_mode != CURSOR_NORMAL || (c->mon && c->mon->overview))
 		return;
 	bool to_tile = !c->floating && !edges && srv.conf.drag_tile_to_tile && !c->maximized && !c->scratch &&
 		!layout_floats(c->mon);
