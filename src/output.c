@@ -953,14 +953,36 @@ static struct client *column_last(struct client *head)
 	return last;
 }
 
+static bool strip_peer(struct client *o, struct client *c, bool shown)
+{
+	if (shown)
+		return tiled(o, c->mon);
+	return o->mon == c->mon && !o->minimized && !o->floating && !o->fullscreen && !o->scratch && !o->maximized &&
+		(o->tags & c->tags);
+}
+
+static struct client *strip_next(struct client *from, struct client *c, bool shown)
+{
+	for (struct wl_list *it = from->link.next; it != &srv.clients; it = it->next) {
+		struct client *o = wl_container_of(it, o, link);
+		if (strip_peer(o, c, shown))
+			return o;
+	}
+	return NULL;
+}
+
 void client_join_strip(struct client *c)
 {
-	if (!c->mon || c->scroll_stacked || !tiled(c, c->mon))
+	if (!c->mon || c->scroll_stacked)
 		return;
-	struct client *next = tiled_neighbor(c, 1);
+	bool shown = client_visible(c) && !c->mon->overview;
+	if (!strip_peer(c, c, shown))
+		return;
+	struct client *next = strip_next(c, c, shown), *last = next;
 	if (!next || !next->scroll_stacked)
 		return;
-	struct client *last = column_last(next);
+	for (struct client *o = strip_next(next, c, shown); o && o->scroll_stacked; o = strip_next(o, c, shown))
+		last = o;
 	wl_list_remove(&c->link);
 	wl_list_insert(&last->link, &c->link);
 }

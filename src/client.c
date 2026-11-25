@@ -253,7 +253,7 @@ void client_resize(struct client *c, struct wlr_box geo)
 		if (c->type == CLIENT_XDG)
 			clip.x += c->s.xdg->base->geometry.x, clip.y += c->s.xdg->base->geometry.y;
 		wlr_scene_node_set_enabled(&c->scene_surface->node, visible);
-		wlr_scene_node_set_position(&c->scene_surface->node, shown.x, shown.y);
+		wlr_scene_node_set_position(&c->scene_surface->node, bw, bw);
 		if (visible && !wlr_box_equal(&clip, &c->clip)) {
 			wlr_scene_subsurface_tree_set_clip(&c->scene_surface->node, &clip);
 			c->clip = clip;
