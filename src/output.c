@@ -976,8 +976,8 @@ static int strip_size(struct client *c, int len, int gap, int n)
 {
 	float share = c->scroll_width > 0 ? c->scroll_width :
 		n == 1 && srv.conf.scroll_width_single > 0 ? srv.conf.scroll_width_single : srv.conf.scroll_width;
-	int s = MAX(1, (int)((len + gap) * share) - gap);
-	return share >= 1.0f ? MAX(1, s - 2 * srv.conf.scroll_struts) : s;
+	int s = (int)((len + gap) * share) - gap;
+	return MAX(1, MIN(s, len - 2 * srv.conf.scroll_struts));
 }
 
 static void scroll_strip(struct monitor *m, bool vertical)

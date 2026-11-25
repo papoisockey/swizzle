@@ -757,6 +757,8 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 		if (m)
 			scratch_show(m, true);
 	}
+	bool fs = c->fullscreen;
+	c->fullscreen = false;
 	if (m) {
 		natural.width += 2 * bw;
 		natural.height += 2 * bw;
@@ -779,8 +781,6 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 	if (!m)
 		wlr_scene_node_set_enabled(&c->scene->node, false);
 
-	bool fs = c->fullscreen;
-	c->fullscreen = false;
 	if (fs)
 		client_set_fullscreen(c, true);
 	else if (client_wants_maximized(c) && !c->scratch)

@@ -786,8 +786,10 @@ static struct client *hover(uint32_t time, struct wlr_surface **surf, double *sx
 		overview_hotarea(srv.cursor->x, srv.cursor->y);
 	}
 	struct client *c = client_at(srv.cursor->x, srv.cursor->y, surf, sx, sy);
+	struct wlr_surface *kf = srv.seat->keyboard_state.focused_surface;
+	struct client *kc = client_from_surface(kf);
 	if (time && srv.conf.focus_follows_mouse && c && c->type != CLIENT_X11_UNMANAGED && c != client_focused() &&
-			!srv.exclusive_focus && !layer_from_surface(srv.seat->keyboard_state.focused_surface) &&
+			!srv.exclusive_focus && !layer_from_surface(kf) && !(kc && kc->type == CLIENT_X11_UNMANAGED) &&
 			srv.seat->pointer_state.grab == srv.seat->pointer_state.default_grab)
 		focus_client(c, false);
 	return c;
@@ -1002,8 +1004,14 @@ void input_button(uint32_t time, uint32_t button, enum wl_pointer_button_state s
 			swallow(button);
 			return;
 		}
-		if (grab_button && button != grab_button)
+		if (grab_button && button != grab_button) {
+			for (size_t i = 0; i < srv.seat->pointer_state.button_count; i++)
+				if (srv.seat->pointer_state.buttons[i].button == button) {
+					wlr_seat_pointer_notify_button(srv.seat, time, button, state);
+					break;
+				}
 			return;
+		}
 		end_grab();
 		for (size_t i = 0; i < srv.seat->pointer_state.button_count; i++)
 			if (srv.seat->pointer_state.buttons[i].button == button) {

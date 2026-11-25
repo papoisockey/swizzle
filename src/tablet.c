@@ -10,7 +10,8 @@
 
 static struct wl_listener tool_axis, tool_proximity, tool_tip, tool_button;
 static struct wlr_tablet_manager_v2 *tablet_mgr;
-static bool tip_swallowed, tip_down;
+static bool tip_swallowed, tip_down, tip_pointer;
+static uint32_t pointer_buttons[8];
 static double tip_dx, tip_dy;
 
 static struct wlr_tablet_v2_tablet_tool *tool_v2(struct wlr_tablet_tool *tool)
@@ -122,24 +123,29 @@ static void handle_tool_tip(struct wl_listener *l, void *data)
 			wlr_send_tablet_v2_tablet_tool_up(t);
 		return;
 	}
-	struct client *c = client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
-	if ((!down || srv.cursor_mode == CURSOR_NORMAL) && t->focused_surface && t->focused_surface == surf) {
-		if (down && input_overview_pick(c)) {
-			tip_swallowed = true;
-			return;
-		}
-		if (down) {
-			input_click_focus(c, surf);
-			wlr_send_tablet_v2_tablet_tool_down(t);
-			tip_down = true;
-			tip_dx = srv.cursor->x - sx;
-			tip_dy = srv.cursor->y - sy;
-		} else {
-			wlr_send_tablet_v2_tablet_tool_up(t);
+	if (!down) {
+		if (tip_pointer) {
+			tip_pointer = false;
+			input_button(ev->time_msec, BTN_LEFT, WL_POINTER_BUTTON_STATE_RELEASED);
+			wlr_seat_pointer_notify_frame(srv.seat);
 		}
 		return;
 	}
-	input_button(ev->time_msec, BTN_LEFT, down ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
+	struct client *c = client_at(srv.cursor->x, srv.cursor->y, &surf, &sx, &sy);
+	if (srv.cursor_mode == CURSOR_NORMAL && t->focused_surface && t->focused_surface == surf) {
+		if (input_overview_pick(c)) {
+			tip_swallowed = true;
+			return;
+		}
+		input_click_focus(c, surf);
+		wlr_send_tablet_v2_tablet_tool_down(t);
+		tip_down = true;
+		tip_dx = srv.cursor->x - sx;
+		tip_dy = srv.cursor->y - sy;
+		return;
+	}
+	tip_pointer = true;
+	input_button(ev->time_msec, BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
 	wlr_seat_pointer_notify_frame(srv.seat);
 }
 
@@ -149,10 +155,25 @@ static void handle_tool_button(struct wl_listener *l, void *data)
 	struct wlr_tablet_v2_tablet_tool *t = tool_v2(ev->tool);
 	if (!t)
 		return;
-	if ((srv.cursor_mode == CURSOR_NORMAL || !ev->state) && t->focused_surface) {
+	size_t slot = LENGTH(pointer_buttons);
+	for (size_t i = 0; i < LENGTH(pointer_buttons); i++)
+		if (pointer_buttons[i] == ev->button)
+			slot = i;
+	if (!ev->state && slot == LENGTH(pointer_buttons)) {
+		if (t->focused_surface)
+			wlr_send_tablet_v2_tablet_tool_button(t, ev->button, (enum zwp_tablet_pad_v2_button_state)ev->state);
+		return;
+	}
+	if (ev->state && srv.cursor_mode == CURSOR_NORMAL && t->focused_surface) {
 		wlr_send_tablet_v2_tablet_tool_button(t, ev->button, (enum zwp_tablet_pad_v2_button_state)ev->state);
 		return;
 	}
+	if (ev->state && slot == LENGTH(pointer_buttons))
+		for (size_t i = 0; i < LENGTH(pointer_buttons) && slot == LENGTH(pointer_buttons); i++)
+			if (!pointer_buttons[i])
+				pointer_buttons[slot = i] = ev->button;
+	if (!ev->state)
+		pointer_buttons[slot] = 0;
 	uint32_t button = ev->button == BTN_STYLUS ? BTN_RIGHT : ev->button == BTN_STYLUS2 ? BTN_MIDDLE : ev->button;
 	input_button(ev->time_msec, button, ev->state ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
 	wlr_seat_pointer_notify_frame(srv.seat);
