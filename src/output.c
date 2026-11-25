@@ -1031,9 +1031,13 @@ static void scroll_strip(struct monitor *m, bool vertical)
 		}
 		int across, alen;
 		split_len(vertical ? a.x : a.y, vertical ? a.width : a.height, vertical ? g.h : g.v, k++, cnt, &across, &alen);
-		client_resize(c, vertical ? (struct wlr_box){across, a.y + pos, alen, size} :
-			(struct wlr_box){a.x + pos, across, size, alen});
-		wlr_scene_node_set_enabled(&c->scene->node, pos >= 0 && pos + size <= len);
+		struct wlr_box box = vertical ? (struct wlr_box){across, a.y + pos, alen, size} :
+			(struct wlr_box){a.x + pos, across, size, alen}, shown;
+		bool visible = wlr_box_intersection(&shown, &box, &a);
+		c->crop = visible && !wlr_box_equal(&shown, &box) ?
+			(struct wlr_box){shown.x - box.x, shown.y - box.y, shown.width, shown.height} : (struct wlr_box){0};
+		client_resize(c, box);
+		wlr_scene_node_set_enabled(&c->scene->node, visible);
 	}
 }
 #endif
@@ -1260,6 +1264,10 @@ void arrange(struct monitor *m)
 			c->single = single;
 			if (!tiled(c, m) && c->mapped)
 				client_resize(c, c->geom);
+		}
+		if (!wlr_box_empty(&c->crop)) {
+			c->crop = (struct wlr_box){0};
+			client_resize(c, c->geom);
 		}
 		if (!on)
 			continue;

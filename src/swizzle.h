@@ -260,6 +260,7 @@ struct client {
 	struct wlr_box overview_geom;
 	bool in_overview;
 	struct wlr_box clip;
+	struct wlr_box crop;
 	uint32_t tags;
 	bool floating, fullscreen, urgent, mapped, active;
 	bool scratch;
@@ -482,6 +483,7 @@ void client_set_overlay(struct client *c, bool on);
 void client_nudge(struct client *c, int dx, int dy, int dw, int dh);
 void client_drop_on(struct client *c, struct client *target);
 struct wlr_box client_fit(struct wlr_box b, struct monitor *m);
+struct wlr_box client_crop(struct client *c);
 const float *client_border_color(struct client *c);
 void client_update_border(struct client *c);
 void client_leave_column(struct client *c);

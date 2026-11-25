@@ -213,7 +213,7 @@ int border_of(struct client *c)
 	return srv.conf.border_width + srv.conf.border_outer_width;
 }
 
-static void set_ring(struct wlr_scene_rect **r, int off, int w, int gw, int gh)
+static void set_ring(struct wlr_scene_rect **r, int off, int w, int gw, int gh, const struct wlr_box *crop)
 {
 	struct wlr_box b[4] = {
 		{off, off, gw - 2 * off, w},
@@ -222,10 +222,19 @@ static void set_ring(struct wlr_scene_rect **r, int off, int w, int gw, int gh)
 		{gw - off - w, off + w, w, gh - 2 * off - 2 * w},
 	};
 	for (size_t i = 0; i < 4; i++) {
-		wlr_scene_node_set_enabled(&r[i]->node, w > 0);
-		wlr_scene_rect_set_size(r[i], MAX(b[i].width, 0), MAX(b[i].height, 0));
-		wlr_scene_node_set_position(&r[i]->node, b[i].x, b[i].y);
+		struct wlr_box v;
+		bool on = w > 0 && wlr_box_intersection(&v, &b[i], crop);
+		wlr_scene_node_set_enabled(&r[i]->node, on);
+		if (!on)
+			continue;
+		wlr_scene_rect_set_size(r[i], v.width, v.height);
+		wlr_scene_node_set_position(&r[i]->node, v.x, v.y);
 	}
+}
+
+struct wlr_box client_crop(struct client *c)
+{
+	return wlr_box_empty(&c->crop) ? (struct wlr_box){0, 0, c->geom.width, c->geom.height} : c->crop;
 }
 
 void client_resize(struct client *c, struct wlr_box geo)
@@ -234,26 +243,29 @@ void client_resize(struct client *c, struct wlr_box geo)
 	geo.width = MAX(geo.width, 2 * bw + 1);
 	geo.height = MAX(geo.height, 2 * bw + 1);
 	c->geom = geo;
+	int w = geo.width - 2 * bw, h = geo.height - 2 * bw;
+	struct wlr_box crop = client_crop(c), area = {bw, bw, w, h}, shown;
+	bool visible = wlr_box_intersection(&shown, &area, &crop);
 
 	effects_move(c, geo.x, geo.y);
-	if (c->scene_surface)
-		wlr_scene_node_set_position(&c->scene_surface->node, bw, bw);
+	if (c->scene_surface) {
+		struct wlr_box clip = {shown.x - bw, shown.y - bw, shown.width, shown.height};
+		if (c->type == CLIENT_XDG)
+			clip.x += c->s.xdg->base->geometry.x, clip.y += c->s.xdg->base->geometry.y;
+		wlr_scene_node_set_enabled(&c->scene_surface->node, visible);
+		wlr_scene_node_set_position(&c->scene_surface->node, shown.x, shown.y);
+		if (visible && !wlr_box_equal(&clip, &c->clip)) {
+			wlr_scene_subsurface_tree_set_clip(&c->scene_surface->node, &clip);
+			c->clip = clip;
+		}
+	}
 	if (c->popups)
 		wlr_scene_node_set_position(&c->popups->node, bw, bw);
 	if (c->border[0]) {
-		set_ring(c->border + 4, 0, ow, geo.width, geo.height);
-		set_ring(c->border, ow, bw - ow, geo.width, geo.height);
+		set_ring(c->border + 4, 0, ow, geo.width, geo.height, &crop);
+		set_ring(c->border, ow, bw - ow, geo.width, geo.height, &crop);
 	}
 	effects_resize(c);
-
-	int w = geo.width - 2 * bw, h = geo.height - 2 * bw;
-	struct wlr_box clip = {0, 0, w, h};
-	if (c->type == CLIENT_XDG)
-		clip.x = c->s.xdg->base->geometry.x, clip.y = c->s.xdg->base->geometry.y;
-	if (c->scene_surface && !wlr_box_equal(&clip, &c->clip)) {
-		wlr_scene_subsurface_tree_set_clip(&c->scene_surface->node, &clip);
-		c->clip = clip;
-	}
 #ifdef XWAYLAND
 	if (c->type != CLIENT_XDG) {
 		if (c->s.xwl->x != geo.x + bw || c->s.xwl->y != geo.y + bw || c->s.xwl->width != w || c->s.xwl->height != h)
@@ -751,6 +763,7 @@ static void client_mapped(struct client *c, struct wlr_box natural)
 	c->scroll_width = 0;
 	c->split = 0;
 	c->in_overview = false;
+	c->crop = (struct wlr_box){0};
 	apply_rules(c, &m, &tags, &rule_focus);
 	struct client *parent = client_parent(c);
 	if (parent && !tags) {

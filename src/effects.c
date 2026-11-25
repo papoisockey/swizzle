@@ -209,15 +209,15 @@ static bool shadow_wanted(struct effects *fx)
 		return r.shadow;
 	}
 	struct client *c = fx->c;
-	return !c->fullscreen && c->type != CLIENT_X11_UNMANAGED && (!srv.conf.shadow_floating_only || c->floating ||
-		c->scratch || c->maximized);
+	return !c->fullscreen && wlr_box_empty(&c->crop) && c->type != CLIENT_X11_UNMANAGED &&
+		(!srv.conf.shadow_floating_only || c->floating || c->scratch || c->maximized);
 }
 
 #ifdef WITH_SCENEFX
 static int radius(struct client *c)
 {
-	int r = c->fullscreen || c->type == CLIENT_X11_UNMANAGED || (c->single && srv.conf.no_radius_when_single) ? 0 :
-		srv.conf.corner_radius;
+	int r = c->fullscreen || !wlr_box_empty(&c->crop) || c->type == CLIENT_X11_UNMANAGED ||
+		(c->single && srv.conf.no_radius_when_single) ? 0 : srv.conf.corner_radius;
 	return MIN(r, MIN(c->geom.width, c->geom.height) / 2);
 }
 
@@ -258,7 +258,7 @@ static bool blur_wanted(struct effects *fx)
 		config_layer(fx->ls->ls->namespace, &r);
 		return r.blur;
 	}
-	return !fx->c->fullscreen;
+	return !fx->c->fullscreen && wlr_box_empty(&fx->c->crop);
 }
 
 static void layout_fx(struct effects *fx, int w, int h, int rad, int bw)
@@ -364,15 +364,16 @@ static void layout_dim(struct effects *fx)
 {
 	struct client *c = fx->c;
 	struct wlr_buffer *b = dim_buf[c->active ? 0 : 1];
-	int bw = border_of(c), w = c->geom.width - 2 * bw, h = c->geom.height - 2 * bw;
-	bool on = b && w > 0 && h > 0 && c->type != CLIENT_X11_UNMANAGED;
+	int bw = border_of(c);
+	struct wlr_box area = {bw, bw, c->geom.width - 2 * bw, c->geom.height - 2 * bw}, crop = client_crop(c), v;
+	bool on = b && c->type != CLIENT_X11_UNMANAGED && wlr_box_intersection(&v, &area, &crop);
 	wlr_scene_node_set_enabled(&fx->dim->node, on);
 	if (!on)
 		return;
 	if (fx->dim->buffer != b)
 		wlr_scene_buffer_set_buffer(fx->dim, b);
-	wlr_scene_buffer_set_dest_size(fx->dim, w, h);
-	wlr_scene_node_set_position(&fx->dim->node, bw, bw);
+	wlr_scene_buffer_set_dest_size(fx->dim, v.width, v.height);
+	wlr_scene_node_set_position(&fx->dim->node, v.x, v.y);
 	if (c->popups)
 		wlr_scene_node_place_below(&fx->dim->node, &c->popups->node);
 	else
