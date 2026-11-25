@@ -912,7 +912,7 @@ static void popup_unconstrain(struct popup *p)
 		wlr_xdg_surface_schedule_configure(p->popup->base);
 		return;
 	}
-	box = c ? m->w : m->m;
+	box = c && !c->fullscreen ? m->w : m->m;
 	if (c) {
 		int bw = border_of(c);
 		box.x -= c->geom.x + bw;

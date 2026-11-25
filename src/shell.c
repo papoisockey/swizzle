@@ -326,6 +326,9 @@ static void handle_new_lock(struct wl_listener *l, void *data)
 	cur = lock;
 	srv.locked = true;
 	input_cancel_grab();
+	struct client *f = client_last_focused();
+	if (f && f->active)
+		client_set_active(f, false);
 	LISTEN(&lock->events.new_surface, &new_surface, handle_new_surface);
 	LISTEN(&lock->events.unlock, &unlock, handle_unlock);
 	LISTEN(&lock->events.destroy, &lock_destroy, handle_lock_destroy);
