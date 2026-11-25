@@ -45,6 +45,7 @@ static bool reload_config(char *err, size_t len)
 	output_update_tag_names();
 
 	input_apply_config();
+	portal_export();
 	struct monitor *m;
 	wl_list_for_each(m, &srv.monitors, link) {
 		for (int t = 0; t <= TAGCOUNT; t++) {

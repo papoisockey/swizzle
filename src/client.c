@@ -239,6 +239,15 @@ struct wlr_box client_crop(struct client *c)
 	return wlr_box_empty(&c->crop) ? (struct wlr_box){0, 0, c->geom.width, c->geom.height} : c->crop;
 }
 
+static void xdg_set_tiled(struct client *c)
+{
+	uint32_t edges = c->floating && !c->maximized ? WLR_EDGE_NONE :
+		WLR_EDGE_TOP | WLR_EDGE_BOTTOM | WLR_EDGE_LEFT | WLR_EDGE_RIGHT;
+	if (wl_resource_get_version(c->s.xdg->resource) >= XDG_TOPLEVEL_STATE_TILED_LEFT_SINCE_VERSION &&
+			c->s.xdg->scheduled.tiled != edges)
+		wlr_xdg_toplevel_set_tiled(c->s.xdg, edges);
+}
+
 void client_resize(struct client *c, struct wlr_box geo)
 {
 	int bw = border_of(c), ow = bw ? srv.conf.border_outer_width : 0;
@@ -277,6 +286,7 @@ void client_resize(struct client *c, struct wlr_box geo)
 #endif
 	if (!c->s.xdg->base->initialized)
 		return;
+	xdg_set_tiled(c);
 	if (c->s.xdg->scheduled.width == w && c->s.xdg->scheduled.height == h)
 		return;
 	wlr_xdg_toplevel_set_size(c->s.xdg, w, h);
@@ -976,9 +986,10 @@ static void handle_xdg_commit(struct wl_listener *l, void *data)
 	struct wlr_xdg_toplevel *t = c->s.xdg;
 
 	if (t->base->initial_commit) {
-		wlr_xdg_toplevel_set_wm_capabilities(t, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
-			WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE);
-		wlr_xdg_toplevel_set_tiled(t, WLR_EDGE_TOP | WLR_EDGE_BOTTOM | WLR_EDGE_LEFT | WLR_EDGE_RIGHT);
+		if (wl_resource_get_version(t->resource) >= XDG_TOPLEVEL_WM_CAPABILITIES_SINCE_VERSION)
+			wlr_xdg_toplevel_set_wm_capabilities(t, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
+				WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE);
+		xdg_set_tiled(c);
 		if (c->deco)
 			deco_apply(c);
 		wlr_xdg_toplevel_set_size(t, 0, 0);
