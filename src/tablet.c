@@ -27,6 +27,10 @@ static bool tool_motion(struct wlr_tablet *tablet, struct wlr_tablet_tool *tool,
 	double sx, sy;
 	if (!t || !tablet->data)
 		return false;
+	if (tip_down && srv.locked) {
+		tip_down = false;
+		tip_swallowed = true;
+	}
 	if (tip_down && t->focused_surface) {
 		wlr_scene_node_set_position(&srv.layers[LYR_DRAG]->node, (int)srv.cursor->x, (int)srv.cursor->y);
 		wlr_send_tablet_v2_tablet_tool_motion(t, srv.cursor->x - tip_dx, srv.cursor->y - tip_dy);

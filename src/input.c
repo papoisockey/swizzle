@@ -840,7 +840,8 @@ void input_motion(uint32_t time, bool warp_only)
 
 	struct wlr_seat_pointer_state *ps = &srv.seat->pointer_state;
 	if (ps->button_count && ps->focused_surface && ps->focused_surface == press_surface && !srv.seat->drag &&
-			ps->grab == ps->default_grab) {
+			ps->grab == ps->default_grab &&
+			(!srv.locked || wlr_session_lock_surface_v1_try_from_wlr_surface(press_surface))) {
 		int nx, ny;
 		surface_origin(press_surface, &nx, &ny);
 		if (time)
@@ -1137,6 +1138,9 @@ static void handle_touch_motion(struct wl_listener *l, void *data)
 	int i = finger(ev->touch_id);
 	double lx, ly;
 	if (i < 0)
+		return;
+	struct wlr_touch_point *p = wlr_seat_touch_get_point(srv.seat, ev->touch_id);
+	if (srv.locked && p && p->surface && !wlr_session_lock_surface_v1_try_from_wlr_surface(p->surface))
 		return;
 	wlr_cursor_absolute_to_layout_coords(srv.cursor, &ev->touch->base, ev->x, ev->y, &lx, &ly);
 	if (srv.seat->drag) {
