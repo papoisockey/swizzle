@@ -19,7 +19,7 @@ static struct wl_listener mgr_apply, mgr_test, power_set_mode, workspace_commit;
 static struct wlr_output_manager_v1 *output_mgr;
 static struct wlr_ext_workspace_manager_v1 *workspaces;
 static struct wl_event_source *state_idle, *lock_retry;
-static bool finishing;
+static bool finishing, focus_cleared;
 
 static bool layout_is(struct monitor *m, const char *name);
 static int tag_slot(uint32_t tags);
@@ -1377,6 +1377,9 @@ void focus_client(struct client *c, bool lift)
 		client_set_active(old, false);
 
 	if (!c) {
+		if (!focus_cleared)
+			ipc_event("focus \t");
+		focus_cleared = true;
 		if (!layer_from_surface(srv.seat->keyboard_state.focused_surface))
 			input_set_focus_surface(NULL);
 		state_changed();
@@ -1384,6 +1387,7 @@ void focus_client(struct client *c, bool lift)
 	}
 	client_set_active(c, true);
 	input_set_focus_surface(client_surface(c));
+	focus_cleared = false;
 	ipc_client_event("focus", c);
 #ifdef WITH_SCROLL
 	if (lift && c->mon && layouts[c->mon->layout].arrange == scroll)

@@ -842,8 +842,10 @@ static struct client *hover(uint32_t time, struct wlr_surface **surf, double *sx
 {
 	if (time) {
 		struct monitor *m = output_at(srv.cursor->x, srv.cursor->y);
-		if (m)
+		if (m && m != srv.selmon) {
 			srv.selmon = m;
+			state_changed();
+		}
 		overview_hotarea(srv.cursor->x, srv.cursor->y);
 	}
 	struct client *c = client_at(srv.cursor->x, srv.cursor->y, surf, sx, sy);
