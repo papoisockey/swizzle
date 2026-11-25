@@ -58,7 +58,10 @@ static bool reload_config(char *err, size_t len)
 			m->mfact = srv.conf.mfact;
 		if (nmaster)
 			m->nmaster = srv.conf.nmaster;
+		int layout = m->layout;
 		output_apply_config(m);
+		if (m->layout != layout)
+			ipc_event("layout %s %s", m->output->name, layout_name(m->layout));
 	}
 	client_update_borders();
 	effects_apply_config();
@@ -832,7 +835,8 @@ static void send_current(struct ipc_client *ic)
 	struct monitor *m;
 	struct client *c = client_focused();
 	wl_list_for_each(m, &srv.monitors, link) {
-		snprintf(line, sizeof(line), "layout %s %s\n", m->output->name, layout_name(m->layout));
+		snprintf(line, sizeof(line), "layout %s %s\noverview %s %d\n", m->output->name, layout_name(m->layout),
+			m->output->name, m->overview);
 		client_write(ic, line, strlen(line));
 	}
 	field(app, sizeof(app), c ? client_app_id(c) : "");
