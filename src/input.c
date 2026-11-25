@@ -898,6 +898,8 @@ void input_motion(uint32_t time, bool warp_only)
 			b.x -= e & WLR_EDGE_LEFT ? min - b.width : 0, b.width = min;
 		if (b.height < min)
 			b.y -= e & WLR_EDGE_TOP ? min - b.height : 0, b.height = min;
+		if (srv.cursor_mode == CURSOR_RESIZE)
+			b = client_clamp_size(srv.grab_c, b, e);
 		if (srv.cursor_mode == CURSOR_MOVE && !srv.grab_tiled)
 			snap(&b, srv.grab_c);
 		grab_to(srv.grab_c, b);

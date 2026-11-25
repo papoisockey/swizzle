@@ -298,6 +298,7 @@ struct client {
 	struct wl_listener ftl_close;
 	struct wl_listener ftl_fullscreen;
 	struct wl_listener ftl_minimize;
+	struct wl_listener ftl_maximize;
 #ifdef XWAYLAND
 	struct wl_listener associate;
 	struct wl_listener dissociate;
@@ -484,6 +485,7 @@ void client_set_overlay(struct client *c, bool on);
 void client_nudge(struct client *c, int dx, int dy, int dw, int dh);
 void client_drop_on(struct client *c, struct client *target);
 struct wlr_box client_fit(struct wlr_box b, struct monitor *m);
+struct wlr_box client_clamp_size(struct client *c, struct wlr_box b, uint32_t edges);
 struct wlr_box client_crop(struct client *c);
 const float *client_border_color(struct client *c);
 void client_update_border(struct client *c);

@@ -292,6 +292,38 @@ void client_resize(struct client *c, struct wlr_box geo)
 	wlr_xdg_toplevel_set_size(c->s.xdg, w, h);
 }
 
+struct wlr_box client_clamp_size(struct client *c, struct wlr_box b, uint32_t edges)
+{
+	int minw = 0, minh = 0, maxw = 0, maxh = 0, bw = border_of(c);
+#ifdef XWAYLAND
+	if (c->type != CLIENT_XDG) {
+		xcb_size_hints_t *h = c->s.xwl->size_hints;
+		if (h && (h->flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE))
+			minw = MAX(0, h->min_width), minh = MAX(0, h->min_height);
+		if (h && (h->flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE))
+			maxw = MAX(0, h->max_width), maxh = MAX(0, h->max_height);
+	} else
+#endif
+	{
+		minw = c->s.xdg->current.min_width, minh = c->s.xdg->current.min_height;
+		maxw = c->s.xdg->current.max_width, maxh = c->s.xdg->current.max_height;
+	}
+	int w = b.width - 2 * bw, h = b.height - 2 * bw;
+	if (maxw > 0)
+		w = MIN(w, maxw);
+	if (maxh > 0)
+		h = MIN(h, maxh);
+	w = MAX(w, minw) + 2 * bw;
+	h = MAX(h, minh) + 2 * bw;
+	if (edges & WLR_EDGE_LEFT)
+		b.x += b.width - w;
+	if (edges & WLR_EDGE_TOP)
+		b.y += b.height - h;
+	b.width = w;
+	b.height = h;
+	return b;
+}
+
 struct wlr_box client_fit(struct wlr_box b, struct monitor *m)
 {
 	if (!m)
@@ -501,9 +533,10 @@ void client_request_activate(struct client *c, bool user)
 {
 	if (!c || !c->mapped || c->type == CLIENT_X11_UNMANAGED || c == client_focused())
 		return;
-	if (user && srv.conf.focus_on_activate && !srv.locked && client_visible(c) &&
-			(!c->mon->fullscreen || c->mon->fullscreen == c)) {
-		focus_client(c, true);
+	bool here = client_visible(c) || (c->minimized && c->mon && (c->scratch ? c->mon->scratch_shown :
+		c->sticky || (c->tags & c->mon->tags)));
+	if (user && srv.conf.focus_on_activate && !srv.locked && here && (!c->mon->fullscreen || c->mon->fullscreen == c)) {
+		client_reveal(c);
 		return;
 	}
 	client_set_urgent(c, true);
@@ -545,6 +578,14 @@ static void handle_ftl_fullscreen(struct wl_listener *l, void *data)
 	struct wlr_foreign_toplevel_handle_v1_fullscreen_event *ev = data;
 	if (!srv.locked)
 		client_set_fullscreen(c, ev->fullscreen);
+}
+
+static void handle_ftl_maximize(struct wl_listener *l, void *data)
+{
+	struct client *c = wl_container_of(l, c, ftl_maximize);
+	struct wlr_foreign_toplevel_handle_v1_maximized_event *ev = data;
+	if (!srv.locked)
+		client_set_maximized(c, ev->maximized);
 }
 
 static void handle_ftl_minimize(struct wl_listener *l, void *data)
@@ -659,6 +700,8 @@ void client_nudge(struct client *c, int dx, int dy, int dw, int dh)
 		client_set_floating(c, true);
 	}
 	struct wlr_box b = {g.x + dx, g.y + dy, MAX(50, g.width + dw), MAX(50, g.height + dh)};
+	if (dw || dh)
+		b = client_clamp_size(c, b, 0);
 	place_floating(c, b);
 	c->prev = b;
 	struct monitor *m = output_at(b.x + b.width / 2.0, b.y + b.height / 2.0);
@@ -686,6 +729,7 @@ static void ftl_create(struct client *c)
 	LISTEN(&c->ftl->events.request_close, &c->ftl_close, handle_ftl_close);
 	LISTEN(&c->ftl->events.request_fullscreen, &c->ftl_fullscreen, handle_ftl_fullscreen);
 	LISTEN(&c->ftl->events.request_minimize, &c->ftl_minimize, handle_ftl_minimize);
+	LISTEN(&c->ftl->events.request_maximize, &c->ftl_maximize, handle_ftl_maximize);
 	wlr_foreign_toplevel_handle_v1_set_minimized(c->ftl, c->minimized);
 	wlr_foreign_toplevel_handle_v1_set_maximized(c->ftl, c->maximized);
 }
@@ -699,6 +743,7 @@ static void ftl_destroy(struct client *c)
 	wl_list_remove(&c->ftl_close.link);
 	wl_list_remove(&c->ftl_fullscreen.link);
 	wl_list_remove(&c->ftl_minimize.link);
+	wl_list_remove(&c->ftl_maximize.link);
 	wlr_foreign_toplevel_handle_v1_destroy(c->ftl);
 	c->ftl = NULL;
 }
