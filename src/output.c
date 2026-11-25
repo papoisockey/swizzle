@@ -30,7 +30,7 @@ static int strip_columns(struct monitor *m);
 
 static bool monitor_off(struct monitor *m)
 {
-	return !m->output->enabled && !m->asleep;
+	return (!m->output->enabled && !m->asleep) || m->oc.enabled == 0;
 }
 
 static struct wlr_output_mode *pick_mode(struct wlr_output *o, const struct output_conf *oc)
