@@ -19,7 +19,7 @@ static struct wl_listener mgr_apply, mgr_test, power_set_mode, workspace_commit;
 static struct wlr_output_manager_v1 *output_mgr;
 static struct wlr_ext_workspace_manager_v1 *workspaces;
 static struct wl_event_source *state_idle, *lock_retry;
-static bool finishing, focus_cleared;
+static bool finishing, focus_cleared, any_fullscreen;
 
 static bool layout_is(struct monitor *m, const char *name);
 static int tag_slot(uint32_t tags);
@@ -1282,11 +1282,17 @@ void arrange(struct monitor *m)
 	if (!m)
 		return;
 	struct client *fs = monitor_fullscreen(m);
-	if (!fs != !m->fullscreen)
-		ipc_event("fullscreen %d", fs != NULL);
 	if (fs != m->fullscreen)
 		wlr_log(WLR_INFO, "%s: fullscreen %s %s", m->output->name, fs ? "on" : "off", fs ? client_app_id(fs) : "");
 	m->fullscreen = fs;
+	bool any = false;
+	struct monitor *o;
+	wl_list_for_each(o, &srv.monitors, link)
+		any = any || o->fullscreen;
+	if (any != any_fullscreen) {
+		any_fullscreen = any;
+		ipc_event("fullscreen %d", any);
+	}
 	bool on = m->output->enabled;
 	int ntiled = count_tiled(m);
 	wl_list_for_each(c, &srv.clients, link) {
@@ -1647,6 +1653,8 @@ void tag(struct client *c, uint32_t tags)
 	c->tags = tags;
 	if (moved)
 		client_join_strip(c);
+	if (moved && c->fullscreen)
+		client_stack_children(c);
 	if (was_focused)
 		focus_top(c->mon);
 	arrange(c->mon);

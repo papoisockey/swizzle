@@ -349,12 +349,7 @@ void client_set_fullscreen(struct client *c, bool fs)
 	if (!c->mapped)
 		return;
 	client_restack(c);
-	struct client *d;
-	wl_list_for_each(d, &srv.clients, link)
-		if (client_is_child_of(d, c) && fs)
-			wlr_scene_node_reparent(&d->scene->node, srv.layers[LYR_FS]);
-		else if (client_is_child_of(d, c))
-			client_restack(d);
+	client_stack_children(c);
 	if (!c->mon)
 		return;
 	if (fs) {
@@ -471,6 +466,19 @@ void client_send_to_monitor(struct client *c, struct monitor *m, uint32_t tags)
 	arrange(m);
 }
 
+void client_stack_children(struct client *c)
+{
+	struct client *d;
+	bool above = c->mapped && c->fullscreen && client_visible(c);
+	wl_list_for_each(d, &srv.clients, link)
+		if (client_is_child_of(d, c)) {
+			if (above)
+				wlr_scene_node_reparent(&d->scene->node, srv.layers[LYR_FS]);
+			else
+				client_restack(d);
+		}
+}
+
 static bool client_is_child_of(struct client *c, struct client *parent)
 {
 	if (!parent || c->type != parent->type)
@@ -559,6 +567,8 @@ void client_set_minimized(struct client *c, bool on)
 	c->minimized = on;
 	if (!on)
 		client_join_strip(c);
+	if (c->fullscreen)
+		client_stack_children(c);
 	if (c->ftl)
 		wlr_foreign_toplevel_handle_v1_set_minimized(c->ftl, on);
 #ifdef XWAYLAND
@@ -885,6 +895,8 @@ static void client_unmapped(struct client *c)
 	client_leave_column(c);
 	c->mapped = false;
 	c->active = false;
+	if (c->fullscreen)
+		client_stack_children(c);
 	ftl_destroy(c);
 	wl_list_remove(&c->link);
 	wl_list_remove(&c->flink);

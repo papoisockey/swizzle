@@ -459,6 +459,7 @@ void client_resize(struct client *c, struct wlr_box geo);
 void client_set_fullscreen(struct client *c, bool fs);
 void client_set_floating(struct client *c, bool fl);
 void client_restack(struct client *c);
+void client_stack_children(struct client *c);
 void client_close(struct client *c);
 void client_set_active(struct client *c, bool on);
 void client_update_borders(void);
