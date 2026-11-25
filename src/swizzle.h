@@ -422,6 +422,7 @@ bool layout_floats(struct monitor *m);
 bool client_reachable(struct client *c);
 void scroll_width(struct client *c, const char *arg);
 void scroll_stack(int dx, int dy);
+bool strip_vertical(struct monitor *m);
 void dwindle_toggle_split(void);
 void tag_step(struct client *c, int dir, bool follow);
 uint32_t tags_shift(int dir, bool occupied);

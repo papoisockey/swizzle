@@ -826,6 +826,8 @@ void client_leave_column(struct client *c)
 			if (o->mon != c->mon || o->minimized || !column_member(o) ||
 					!(shown ? client_visible(o) : (o->tags & c->tags) != 0))
 				continue;
+			if (o->scroll_stacked && !strip_vertical(c->mon))
+				o->scroll_width = c->scroll_width;
 			o->scroll_stacked = false;
 			break;
 		}

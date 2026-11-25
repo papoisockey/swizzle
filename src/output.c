@@ -1050,8 +1050,24 @@ static void vertical_scroll(struct monitor *m)
 }
 #endif
 
+static void swap_slots(struct client *a, struct client *b)
+{
+	bool s = a->scroll_stacked;
+	if (s != b->scroll_stacked && !strip_vertical(a->mon)) {
+		float w = a->scroll_width;
+		a->scroll_width = b->scroll_width;
+		b->scroll_width = w;
+	}
+	a->scroll_stacked = b->scroll_stacked;
+	b->scroll_stacked = s;
+	list_swap(&a->link, &b->link);
+}
+
 void scroll_width(struct client *c, const char *arg)
 {
+	if (c->mon && tiled(c, c->mon) && !strip_vertical(c->mon))
+		while (c->scroll_stacked && tiled_neighbor(c, -1))
+			c = tiled_neighbor(c, -1);
 	const float *presets = srv.conf.scroll_presets;
 	int np = srv.conf.nscroll_presets, i = 0;
 	float cur = c->scroll_width > 0 ? c->scroll_width :
@@ -1080,17 +1096,17 @@ void scroll_stack(int dx, int dy)
 		struct client *o = dy < 0 ? (sel->scroll_stacked ? prev : NULL) : (next && next->scroll_stacked ? next : NULL);
 		if (!o)
 			return;
-		bool t = sel->scroll_stacked;
-		sel->scroll_stacked = o->scroll_stacked;
-		o->scroll_stacked = t;
-		list_swap(&sel->link, &o->link);
+		swap_slots(sel, o);
 	} else if (in_column) {
 		struct client *head = sel;
 		while (head->scroll_stacked && tiled_neighbor(head, -1))
 			head = tiled_neighbor(head, -1);
 		struct client *last = column_last(head);
-		if (head == sel && next)
+		if (head == sel && next) {
 			next->scroll_stacked = false;
+			if (!strip_vertical(sel->mon))
+				next->scroll_width = sel->scroll_width;
+		}
 		sel->scroll_stacked = false;
 		wl_list_remove(&sel->link);
 		if (dx < 0)
@@ -1161,14 +1177,20 @@ static const struct {
 #endif
 };
 
+bool strip_vertical(struct monitor *m)
+{
+#ifdef WITH_VERTICAL_SCROLL
+	return m && layouts[m->layout].arrange == vertical_scroll;
+#else
+	return false;
+#endif
+}
+
 static int strip_columns(struct monitor *m)
 {
 	struct client *c;
-	bool vertical = false;
+	bool vertical = strip_vertical(m);
 	int n = 0;
-#ifdef WITH_VERTICAL_SCROLL
-	vertical = m && layouts[m->layout].arrange == vertical_scroll;
-#endif
 	wl_list_for_each(c, &srv.clients, link)
 		if (tiled(c, m) && (vertical || !c->scroll_stacked || !n))
 			n++;
@@ -1402,10 +1424,7 @@ void swap_dir(int dx, int dy)
 	struct client *sel = client_focused(), *other;
 	if (!sel || !tiled(sel, sel->mon) || !(other = client_in_dir(sel, dx, dy, true)))
 		return;
-	bool stacked = sel->scroll_stacked;
-	sel->scroll_stacked = other->scroll_stacked;
-	other->scroll_stacked = stacked;
-	list_swap(&sel->link, &other->link);
+	swap_slots(sel, other);
 	arrange(sel->mon);
 }
 
@@ -1418,10 +1437,7 @@ void client_drop_on(struct client *c, struct client *target)
 	}
 	if (target->mon != c->mon)
 		client_send_to_monitor(c, target->mon, target->mon->tags);
-	bool stacked = c->scroll_stacked;
-	c->scroll_stacked = target->scroll_stacked;
-	target->scroll_stacked = stacked;
-	list_swap(&c->link, &target->link);
+	swap_slots(c, target);
 	arrange(target->mon);
 	if (old != target->mon)
 		arrange(old);
@@ -1598,8 +1614,11 @@ void zoom(void)
 			return;
 	}
 	struct client *below = tiled_neighbor(sel, 1);
-	if (below && below->scroll_stacked && !sel->scroll_stacked)
+	if (below && below->scroll_stacked && !sel->scroll_stacked) {
 		below->scroll_stacked = false;
+		if (!strip_vertical(sel->mon))
+			below->scroll_width = sel->scroll_width;
+	}
 	sel->scroll_stacked = false;
 	wl_list_remove(&sel->link);
 	wl_list_insert(&srv.clients, &sel->link);
