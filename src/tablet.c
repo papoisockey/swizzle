@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdlib.h>
 #ifdef __linux__
 #include <linux/input-event-codes.h>
 #else
@@ -36,11 +37,48 @@ static void release_pointer(uint32_t time)
 		wlr_seat_pointer_notify_frame(srv.seat);
 }
 
+struct tool {
+	struct wlr_tablet_v2_tablet_tool *v2;
+	struct wl_listener set_cursor;
+	struct wl_listener destroy;
+};
+
+static void handle_tool_set_cursor(struct wl_listener *l, void *data)
+{
+	struct tool *t = wl_container_of(l, t, set_cursor);
+	struct wlr_tablet_v2_event_cursor *ev = data;
+	struct wlr_surface *focused = t->v2->focused_surface;
+	if (srv.cursor_mode != CURSOR_NORMAL || tip_pointer || !focused || !ev->seat_client ||
+			ev->seat_client->client != wl_resource_get_client(focused->resource))
+		return;
+	wlr_cursor_set_surface(srv.cursor, ev->surface, ev->hotspot_x, ev->hotspot_y);
+}
+
+static void handle_tool_destroy(struct wl_listener *l, void *data)
+{
+	struct tool *t = wl_container_of(l, t, destroy);
+	wl_list_remove(&t->set_cursor.link);
+	wl_list_remove(&t->destroy.link);
+	free(t);
+}
+
 static struct wlr_tablet_v2_tablet_tool *tool_v2(struct wlr_tablet_tool *tool)
 {
-	if (!tool->data)
-		tool->data = wlr_tablet_tool_create(tablet_mgr, srv.seat, tool);
-	return tool->data;
+	struct tool *t = tool->data;
+	if (t)
+		return t->v2;
+	if (!(t = calloc(1, sizeof(*t))))
+		return NULL;
+	LISTEN(&tool->events.destroy, &t->destroy, handle_tool_destroy);
+	t->v2 = wlr_tablet_tool_create(tablet_mgr, srv.seat, tool);
+	if (!t->v2) {
+		wl_list_remove(&t->destroy.link);
+		free(t);
+		return NULL;
+	}
+	LISTEN(&t->v2->events.set_cursor, &t->set_cursor, handle_tool_set_cursor);
+	tool->data = t;
+	return t->v2;
 }
 
 static bool tool_motion(struct wlr_tablet *tablet, struct wlr_tablet_tool *tool, uint32_t time)
