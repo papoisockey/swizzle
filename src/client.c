@@ -1395,6 +1395,17 @@ static void handle_x11_geometry(struct wl_listener *l, void *data)
 		wlr_scene_node_set_position(&c->scene->node, c->s.xwl->x, c->s.xwl->y);
 }
 
+static void handle_x11_override_redirect(struct wl_listener *l, void *data)
+{
+	struct client *c = wl_container_of(l, c, set_override_redirect);
+	struct wlr_xwayland_surface *x = c->s.xwl;
+	enum client_type type = x->override_redirect ? CLIENT_X11_UNMANAGED : CLIENT_X11;
+	if (!c->mapped || type == c->type || !x->surface || !x->surface->mapped)
+		return;
+	handle_x11_unmap(&c->unmap, NULL);
+	handle_x11_map(&c->map, NULL);
+}
+
 static void handle_x11_minimize(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, minimize);
@@ -1432,6 +1443,7 @@ static void handle_x11_destroy(struct wl_listener *l, void *data)
 	wl_list_remove(&c->set_hints.link);
 	wl_list_remove(&c->minimize.link);
 	wl_list_remove(&c->set_geometry.link);
+	wl_list_remove(&c->set_override_redirect.link);
 	wl_list_remove(&c->set_title.link);
 	wl_list_remove(&c->set_app_id.link);
 	wl_list_remove(&c->request_fullscreen.link);
@@ -1459,6 +1471,7 @@ static void handle_new_xwayland_surface(struct wl_listener *l, void *data)
 	LISTEN(&x->events.set_hints, &c->set_hints, handle_x11_hints);
 	LISTEN(&x->events.request_minimize, &c->minimize, handle_x11_minimize);
 	LISTEN(&x->events.set_geometry, &c->set_geometry, handle_x11_geometry);
+	LISTEN(&x->events.set_override_redirect, &c->set_override_redirect, handle_x11_override_redirect);
 	LISTEN(&x->events.set_title, &c->set_title, handle_set_title);
 	LISTEN(&x->events.set_class, &c->set_app_id, handle_set_app_id);
 	LISTEN(&x->events.request_fullscreen, &c->request_fullscreen, handle_request_fullscreen);

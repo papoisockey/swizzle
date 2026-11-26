@@ -309,6 +309,7 @@ struct client {
 	struct wl_listener set_hints;
 	struct wl_listener minimize;
 	struct wl_listener set_geometry;
+	struct wl_listener set_override_redirect;
 #endif
 };
 
