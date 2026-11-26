@@ -1044,7 +1044,11 @@ static void handle_xdg_commit(struct wl_listener *l, void *data)
 	if (t->base->initial_commit) {
 		if (wl_resource_get_version(t->resource) >= XDG_TOPLEVEL_WM_CAPABILITIES_SINCE_VERSION)
 			wlr_xdg_toplevel_set_wm_capabilities(t, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
-				WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE);
+				WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE | WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE);
+		if (srv.selmon && wl_resource_get_version(t->resource) >= XDG_TOPLEVEL_CONFIGURE_BOUNDS_SINCE_VERSION) {
+			int bw = srv.conf.border_width + srv.conf.border_outer_width;
+			wlr_xdg_toplevel_set_bounds(t, MAX(0, srv.selmon->w.width - 2 * bw), MAX(0, srv.selmon->w.height - 2 * bw));
+		}
 		xdg_set_tiled(c);
 		if (c->deco)
 			deco_apply(c);
@@ -1084,6 +1088,7 @@ static void handle_xdg_destroy(struct wl_listener *l, void *data)
 	wl_list_remove(&c->destroy.link);
 	wl_list_remove(&c->request_fullscreen.link);
 	wl_list_remove(&c->request_maximize.link);
+	wl_list_remove(&c->request_minimize.link);
 	wl_list_remove(&c->request_move.link);
 	wl_list_remove(&c->request_resize.link);
 	wl_list_remove(&c->set_title.link);
@@ -1168,6 +1173,12 @@ static void handle_request_maximize(struct wl_listener *l, void *data)
 		wlr_xdg_surface_schedule_configure(c->s.xdg->base);
 }
 
+static void handle_request_minimize(struct wl_listener *l, void *data)
+{
+	struct client *c = wl_container_of(l, c, request_minimize);
+	client_set_minimized(c, true);
+}
+
 static void handle_set_title(struct wl_listener *l, void *data)
 {
 	struct client *c = wl_container_of(l, c, set_title);
@@ -1220,6 +1231,7 @@ static void handle_new_toplevel(struct wl_listener *l, void *data)
 	LISTEN(&t->events.destroy, &c->destroy, handle_xdg_destroy);
 	LISTEN(&t->events.request_fullscreen, &c->request_fullscreen, handle_request_fullscreen);
 	LISTEN(&t->events.request_maximize, &c->request_maximize, handle_request_maximize);
+	LISTEN(&t->events.request_minimize, &c->request_minimize, handle_request_minimize);
 	LISTEN(&t->events.request_move, &c->request_move, handle_request_move);
 	LISTEN(&t->events.request_resize, &c->request_resize, handle_request_resize);
 	LISTEN(&t->events.set_title, &c->set_title, handle_set_title);
