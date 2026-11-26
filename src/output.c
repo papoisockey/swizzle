@@ -281,6 +281,7 @@ static void handle_destroy(struct wl_listener *l, void *data)
 	wl_list_remove(&m->request_state.link);
 	wl_list_remove(&m->destroy.link);
 	wl_list_remove(&m->link);
+	input_output_destroyed(m->output);
 	m->output->data = NULL;
 	if (m->root)
 		wlr_scene_node_destroy(&m->root->node);

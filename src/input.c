@@ -35,6 +35,7 @@
 struct device {
 	struct wl_list link;
 	struct wlr_input_device *dev;
+	struct wlr_output *output;
 	struct wl_listener destroy;
 };
 
@@ -199,10 +200,20 @@ void input_map_touch(void)
 	wl_list_for_each(d, &touches, link) {
 		struct wlr_touch *t = wlr_touch_from_input_device(d->dev);
 		struct monitor *m = t->output_name ? output_by_name(t->output_name) : NULL;
-		if (m)
-			wlr_cursor_map_input_to_output(srv.cursor, d->dev, m->output);
+		wlr_cursor_map_input_to_output(srv.cursor, d->dev, m ? m->output : NULL);
 	}
 	tablet_map();
+}
+
+void input_output_destroyed(struct wlr_output *o)
+{
+	struct device *d;
+	wl_list_for_each(d, &vpointers, link)
+		if (d->output == o) {
+			wlr_cursor_map_input_to_output(srv.cursor, d->dev, NULL);
+			d->output = NULL;
+		}
+	input_map_touch();
 }
 
 static void update_caps(void)
@@ -220,14 +231,15 @@ static void handle_device_destroy(struct wl_listener *l, void *data)
 	update_caps();
 }
 
-static void track_device(struct wl_list *list, struct wlr_input_device *dev)
+static struct device *track_device(struct wl_list *list, struct wlr_input_device *dev)
 {
 	struct device *d = calloc(1, sizeof(*d));
 	if (!d)
-		return;
+		return NULL;
 	d->dev = dev;
 	wl_list_insert(list, &d->link);
 	LISTEN(&dev->events.destroy, &d->destroy, handle_device_destroy);
+	return d;
 }
 
 static char *gtk_cursor_theme(void)
@@ -568,9 +580,11 @@ static void handle_new_vpointer(struct wl_listener *l, void *data)
 	struct wlr_virtual_pointer_v1_new_pointer_event *ev = data;
 	struct wlr_input_device *dev = &ev->new_pointer->pointer.base;
 	wlr_cursor_attach_input_device(srv.cursor, dev);
-	track_device(&vpointers, dev);
-	if (ev->suggested_output)
-		wlr_cursor_map_input_to_output(srv.cursor, dev, ev->suggested_output);
+	struct device *d = track_device(&vpointers, dev);
+	if (d && ev->suggested_output && ev->suggested_output->data) {
+		d->output = ev->suggested_output;
+		wlr_cursor_map_input_to_output(srv.cursor, dev, d->output);
+	}
 }
 
 static bool locked_virtual(struct wlr_pointer *p)

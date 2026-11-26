@@ -452,6 +452,7 @@ void input_set_focus_surface(struct wlr_surface *surface);
 void input_click_focus(struct client *c, struct wlr_surface *surf);
 void input_activity(void);
 void input_map_touch(void);
+void input_output_destroyed(struct wlr_output *o);
 void input_update_idle(struct wlr_idle_inhibitor_v1 *gone);
 void input_warp_to(struct client *c);
 void input_surface_origin(struct wlr_surface *s, int *x, int *y);

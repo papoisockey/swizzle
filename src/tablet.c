@@ -320,8 +320,7 @@ void tablet_map(void)
 		struct libinput_device *d = libinput_of(t->dev);
 		const char *name = d ? libinput_device_get_output_name(d) : NULL;
 		struct monitor *m = name ? output_by_name(name) : NULL;
-		if (m)
-			wlr_cursor_map_input_to_output(srv.cursor, t->dev, m->output);
+		wlr_cursor_map_input_to_output(srv.cursor, t->dev, m ? m->output : NULL);
 	}
 }
 
