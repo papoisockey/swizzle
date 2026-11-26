@@ -158,7 +158,8 @@ void output_apply_config(struct monitor *m)
 		build_state(m, &st, false);
 		ok = wlr_output_commit_state(m->output, &st);
 		wlr_output_state_finish(&st);
-		m->vrr_failed = ok && oc->vrr == VRR_ON;
+		m->vrr_failed = ok;
+		m->vrr_rejected_on = oc->vrr == VRR_ON;
 	}
 	if (!ok) {
 		wlr_log(WLR_ERROR, "%s: config rejected, using preferred mode", m->output->name);
@@ -189,6 +190,8 @@ static bool commit_frame(struct monitor *m)
 	bool want_vrr = oc->vrr == VRR_ON || ((oc->vrr == VRR_FULLSCREEN || oc->vrr == VRR_CONTENT) && fs) ||
 		(f && f->mon == m && client_visible(f) && client_wants_vrr(f));
 	bool cur_vrr = m->output->adaptive_sync_status == WLR_OUTPUT_ADAPTIVE_SYNC_ENABLED;
+	if (m->vrr_failed && want_vrr != m->vrr_rejected_on)
+		m->vrr_failed = false;
 	if (!m->vrr_failed && m->output->adaptive_sync_supported && want_vrr != cur_vrr)
 		wlr_output_state_set_adaptive_sync_enabled(&st, want_vrr);
 
@@ -214,7 +217,8 @@ static bool commit_frame(struct monitor *m)
 		wlr_log(WLR_INFO, "%s: vrr %s rejected", m->output->name, want_vrr ? "on" : "off");
 		st.committed &= ~WLR_OUTPUT_STATE_ADAPTIVE_SYNC_ENABLED;
 		ok = wlr_output_commit_state(m->output, &st);
-		m->vrr_failed = ok && want_vrr;
+		m->vrr_failed = ok;
+		m->vrr_rejected_on = want_vrr;
 	}
 out:
 	wlr_output_state_finish(&st);

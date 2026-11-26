@@ -222,6 +222,7 @@ struct monitor {
 	struct wlr_scene_rect *root;
 	struct wlr_scene_node *optimized_blur;
 	bool vrr_failed;
+	bool vrr_rejected_on;
 	bool vrr_toggled;
 	bool tearing_active;
 	bool asleep;
