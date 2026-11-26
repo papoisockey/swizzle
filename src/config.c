@@ -794,10 +794,11 @@ static void parse_output(struct output_conf *o, const char *k, const char *v, in
 	} else if (!strcmp(k, "direct_scanout")) {
 		o->direct_scanout = bool_or(v, o->direct_scanout);
 	} else if (!strcmp(k, "hardware_cursor")) {
-		if (!strcmp(v, "auto"))
-			o->hardware_cursor = 2;
+		int b = !strcmp(v, "auto") ? 2 : bool_of(v);
+		if (b < 0)
+			conf_error("config:%d: expected 1, 0 or auto, got '%s'", line, v);
 		else
-			o->hardware_cursor = bool_or(v, o->hardware_cursor);
+			o->hardware_cursor = b;
 	} else if (!strcmp(k, "primary")) {
 		o->primary = bool_or(v, o->primary);
 	} else if (!strcmp(k, "tag_layouts")) {

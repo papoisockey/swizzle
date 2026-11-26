@@ -53,6 +53,8 @@ static size_t nprivileged;
 static struct wl_listener renderer_lost;
 static struct wl_event_source *gpu_idle;
 static int own_fd = -1;
+static pid_t *autostart;
+static size_t nautostart;
 
 void privileged_add(const struct wl_global *g)
 {
@@ -138,6 +140,14 @@ void quit(void)
 static int handle_signal(int sig, void *data)
 {
 	quit();
+	return 0;
+}
+
+static int handle_child(int sig, void *data)
+{
+	for (size_t i = 0; autostart && i < nautostart; i++)
+		if (autostart[i] > 0 && waitpid(autostart[i], NULL, WNOHANG) == autostart[i])
+			autostart[i] = 0;
 	return 0;
 }
 
@@ -631,16 +641,16 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 	struct wl_event_source *sigint = wl_event_loop_add_signal(srv.loop, SIGINT, handle_signal, NULL);
 	struct wl_event_source *sigterm = wl_event_loop_add_signal(srv.loop, SIGTERM, handle_signal, NULL);
+	struct wl_event_source *sigchld = wl_event_loop_add_signal(srv.loop, SIGCHLD, handle_child, NULL);
 
 	if (srv.selmon)
 		wlr_cursor_warp_closest(srv.cursor, NULL, srv.selmon->m.x + srv.selmon->m.width / 2.0,
 			srv.selmon->m.y + srv.selmon->m.height / 2.0);
-	pid_t *autostart = calloc(srv.conf.nautostart ? srv.conf.nautostart : 1, sizeof(*autostart));
-	size_t nautostart = srv.conf.nautostart;
-	for (size_t i = 0; i < nautostart; i++) {
+	autostart = calloc(srv.conf.nautostart ? srv.conf.nautostart : 1, sizeof(*autostart));
+	for (size_t i = 0; i < srv.conf.nautostart; i++) {
 		pid_t pg = spawn_group(srv.conf.autostart[i]);
 		if (autostart)
-			autostart[i] = pg;
+			autostart[i] = pg, nautostart = i + 1;
 	}
 
 	wlr_log(WLR_INFO, "running on WAYLAND_DISPLAY=%s", socket);
@@ -652,9 +662,12 @@ int main(int argc, char *argv[])
 			waitpid(autostart[i], NULL, WNOHANG);
 		}
 	free(autostart);
+	autostart = NULL;
 	ipc_finish();
 	wl_event_source_remove(sigint);
 	wl_event_source_remove(sigterm);
+	if (sigchld)
+		wl_event_source_remove(sigchld);
 	wl_display_destroy_clients(srv.display);
 	client_finish();
 	shell_finish();
