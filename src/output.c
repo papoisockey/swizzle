@@ -199,7 +199,7 @@ static bool commit_frame(struct monitor *m)
 
 	ok = wlr_output_commit_state(m->output, &st);
 	if (!ok && st.tearing_page_flip) {
-		wlr_log(WLR_INFO, "%s: tearing page flip rejected", m->output->name);
+		wlr_log(WLR_DEBUG, "%s: tearing page flip rejected", m->output->name);
 		st.tearing_page_flip = false;
 		ok = wlr_output_commit_state(m->output, &st);
 	}
@@ -213,8 +213,8 @@ static bool commit_frame(struct monitor *m)
 	if (st.committed & WLR_OUTPUT_STATE_ADAPTIVE_SYNC_ENABLED) {
 		wlr_log(WLR_INFO, "%s: vrr rejected, disabling", m->output->name);
 		st.committed &= ~WLR_OUTPUT_STATE_ADAPTIVE_SYNC_ENABLED;
-		m->vrr_failed = true;
 		ok = wlr_output_commit_state(m->output, &st);
+		m->vrr_failed = ok;
 	}
 out:
 	wlr_output_state_finish(&st);

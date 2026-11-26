@@ -801,7 +801,16 @@ static void blank(char *s, const char *chars)
 
 static void field(char *dst, size_t n, const char *s)
 {
-	snprintf(dst, n, "%s", s);
+	size_t len = (size_t)snprintf(dst, n, "%s", s);
+	if (len >= n) {
+		size_t k = n - 1;
+		while (k > 0 && ((unsigned char)dst[k - 1] & 0xc0) == 0x80)
+			k--;
+		unsigned char lead = k > 0 ? (unsigned char)dst[k - 1] : 0;
+		size_t need = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
+		if (k > 0 && n - k < need)
+			dst[k - 1] = '\0';
+	}
 	blank(dst, "\t\n\r");
 }
 
