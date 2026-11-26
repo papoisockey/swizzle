@@ -114,6 +114,7 @@ static void handle_layer_map(struct wl_listener *l, void *data)
 	wlr_log(WLR_DEBUG, "layer surface mapped: %s", ls->ls->namespace ? ls->ls->namespace : "");
 	if (ls->mon && !ls->mon->output->enabled && !ls->mon->asleep) {
 		wlr_scene_node_set_enabled(&ls->scene->node, false);
+		effects_layer_map(ls);
 		return;
 	}
 	if (ls->mon)

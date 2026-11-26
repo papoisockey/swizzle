@@ -458,6 +458,7 @@ void input_surface_origin(struct wlr_surface *s, int *x, int *y);
 void client_init(void);
 void client_finish(void);
 void client_resize(struct client *c, struct wlr_box geo);
+void client_set_bounds(struct client *c, struct monitor *m);
 void client_set_fullscreen(struct client *c, bool fs);
 void client_set_floating(struct client *c, bool fl);
 void client_restack(struct client *c);

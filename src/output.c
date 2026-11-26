@@ -158,7 +158,7 @@ void output_apply_config(struct monitor *m)
 		build_state(m, &st, false);
 		ok = wlr_output_commit_state(m->output, &st);
 		wlr_output_state_finish(&st);
-		m->vrr_failed = ok;
+		m->vrr_failed = ok && oc->vrr == VRR_ON;
 	}
 	if (!ok) {
 		wlr_log(WLR_ERROR, "%s: config rejected, using preferred mode", m->output->name);
@@ -211,10 +211,10 @@ static bool commit_frame(struct monitor *m)
 		goto out;
 	wlr_log(WLR_ERROR, "%s: frame commit failed", m->output->name);
 	if (st.committed & WLR_OUTPUT_STATE_ADAPTIVE_SYNC_ENABLED) {
-		wlr_log(WLR_INFO, "%s: vrr rejected, disabling", m->output->name);
+		wlr_log(WLR_INFO, "%s: vrr %s rejected", m->output->name, want_vrr ? "on" : "off");
 		st.committed &= ~WLR_OUTPUT_STATE_ADAPTIVE_SYNC_ENABLED;
 		ok = wlr_output_commit_state(m->output, &st);
-		m->vrr_failed = ok;
+		m->vrr_failed = ok && want_vrr;
 	}
 out:
 	wlr_output_state_finish(&st);
@@ -1301,6 +1301,7 @@ void arrange(struct monitor *m)
 	wl_list_for_each(c, &srv.clients, link) {
 		if (c->mon != m)
 			continue;
+		client_set_bounds(c, m);
 		bool vis = client_visible(c), single = ntiled == 1 && tiled(c, m);
 		wlr_scene_node_set_enabled(&c->scene->node, vis);
 		if (single != c->single) {
@@ -1553,6 +1554,10 @@ static int switch_slot(struct monitor *m, uint32_t old)
 static void tags_switched(struct monitor *m, uint32_t old)
 {
 	int o = switch_slot(m, old);
+	struct client *c;
+	wl_list_for_each(c, &srv.clients, link)
+		if (c->mon == m && c->fullscreen)
+			client_stack_children(c);
 	effects_tag_leave(m, old, m->tags);
 	focus_top(m);
 	arrange(m);

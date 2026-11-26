@@ -995,7 +995,7 @@ void effects_layer_map(struct layer_surface *ls)
 #endif
 	layout(fx);
 	config_layer(ls->ls->namespace, &r);
-	if (r.animations)
+	if (r.animations && ls->scene->node.enabled)
 		open_window(fx, (enum anim_kind)r.anim_open, srv.conf.fade_in, dur(DUR_OPEN));
 }
 

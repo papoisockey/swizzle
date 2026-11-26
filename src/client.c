@@ -248,6 +248,17 @@ static void xdg_set_tiled(struct client *c)
 		wlr_xdg_toplevel_set_tiled(c->s.xdg, edges);
 }
 
+void client_set_bounds(struct client *c, struct monitor *m)
+{
+	if (c->type != CLIENT_XDG || !m || !c->s.xdg->base->initialized ||
+			wl_resource_get_version(c->s.xdg->resource) < XDG_TOPLEVEL_CONFIGURE_BOUNDS_SINCE_VERSION)
+		return;
+	int bw = srv.conf.border_width + srv.conf.border_outer_width;
+	int w = MAX(0, m->w.width - 2 * bw), h = MAX(0, m->w.height - 2 * bw);
+	if (c->s.xdg->scheduled.bounds.width != w || c->s.xdg->scheduled.bounds.height != h)
+		wlr_xdg_toplevel_set_bounds(c->s.xdg, w, h);
+}
+
 void client_resize(struct client *c, struct wlr_box geo)
 {
 	int bw = border_of(c), ow = bw ? srv.conf.border_outer_width : 0;
@@ -463,6 +474,8 @@ void client_send_to_monitor(struct client *c, struct monitor *m, uint32_t tags)
 	c->tags = newtags;
 	if (moved)
 		client_join_strip(c);
+	if (moved && c->fullscreen)
+		client_stack_children(c);
 	if (c->ftl && old != m) {
 		if (old)
 			wlr_foreign_toplevel_handle_v1_output_leave(c->ftl, old->output);
@@ -1045,10 +1058,7 @@ static void handle_xdg_commit(struct wl_listener *l, void *data)
 		if (wl_resource_get_version(t->resource) >= XDG_TOPLEVEL_WM_CAPABILITIES_SINCE_VERSION)
 			wlr_xdg_toplevel_set_wm_capabilities(t, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
 				WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE | WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE);
-		if (srv.selmon && wl_resource_get_version(t->resource) >= XDG_TOPLEVEL_CONFIGURE_BOUNDS_SINCE_VERSION) {
-			int bw = srv.conf.border_width + srv.conf.border_outer_width;
-			wlr_xdg_toplevel_set_bounds(t, MAX(0, srv.selmon->w.width - 2 * bw), MAX(0, srv.selmon->w.height - 2 * bw));
-		}
+		client_set_bounds(c, srv.selmon);
 		xdg_set_tiled(c);
 		if (c->deco)
 			deco_apply(c);
