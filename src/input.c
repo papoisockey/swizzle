@@ -77,7 +77,7 @@ static struct wlr_idle_inhibit_manager_v1 *idle_inhibit;
 static struct wl_event_source *repeat_timer;
 static uint32_t repeat_mods;
 static xkb_keysym_t repeat_sym;
-static uint32_t swallowed[8];
+static uint32_t swallowed[WLR_POINTER_BUTTONS_CAP];
 static uint32_t consumed[WLR_KEYBOARD_KEYS_CAP];
 static size_t nconsumed;
 static uint32_t grab_button;

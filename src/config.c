@@ -802,11 +802,16 @@ static void parse_output(struct output_conf *o, const char *k, const char *v, in
 	} else if (!strcmp(k, "primary")) {
 		o->primary = bool_or(v, o->primary);
 	} else if (!strcmp(k, "tag_layouts")) {
-		for (int i = 0; i < TAGCOUNT; i++) {
+		for (int i = 0;; i++) {
 			size_t n = strcspn(v, ",");
 			char name[32];
 			snprintf(name, sizeof(name), "%.*s", (int)MIN(n, sizeof(name) - 1), v);
 			char *t = trim(name);
+			if (i == TAGCOUNT) {
+				if (*t || v[n])
+					conf_error("config:%d: more than %d tag layouts", line, TAGCOUNT);
+				break;
+			}
 			o->tag_layout[i] = *t ? layout_from_name(t) : -1;
 			if (*t && o->tag_layout[i] < 0)
 				conf_error("config:%d: invalid layout '%s'", line, t);
