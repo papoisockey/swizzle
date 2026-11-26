@@ -92,7 +92,7 @@ void output_apply_config(struct monitor *m)
 {
 	const struct output_conf *oc = &m->oc;
 	struct wlr_output_state st;
-	bool ok;
+	bool ok, had_vrr;
 
 	struct output_conf next;
 	config_output(m->output->name, &next);
@@ -149,15 +149,16 @@ void output_apply_config(struct monitor *m)
 		goto layout;
 	wlr_output_state_init(&st);
 	build_state(m, &st, true);
+	had_vrr = st.committed & WLR_OUTPUT_STATE_ADAPTIVE_SYNC_ENABLED;
 	ok = wlr_output_commit_state(m->output, &st);
 	wlr_output_state_finish(&st);
-	if (!ok) {
+	if (!ok && had_vrr) {
 		wlr_log(WLR_ERROR, "%s: config rejected, retrying without vrr", m->output->name);
-		m->vrr_failed = true;
 		wlr_output_state_init(&st);
 		build_state(m, &st, false);
 		ok = wlr_output_commit_state(m->output, &st);
 		wlr_output_state_finish(&st);
+		m->vrr_failed = ok;
 	}
 	if (!ok) {
 		wlr_log(WLR_ERROR, "%s: config rejected, using preferred mode", m->output->name);
@@ -581,8 +582,10 @@ static void apply_output_config(struct wlr_output_configuration_v1 *cfg, bool te
 		if (!ok || test || !m)
 			continue;
 		m->asleep = m->asleep && h->state.enabled;
-		if (m->vrr_toggled)
+		if (m->vrr_toggled) {
 			m->oc.vrr = h->state.adaptive_sync_enabled ? VRR_ON : VRR_OFF;
+			m->vrr_failed = false;
+		}
 		m->oc.enabled = h->state.enabled;
 		if (!h->state.enabled) {
 			wlr_output_layout_remove(srv.output_layout, m->output);
