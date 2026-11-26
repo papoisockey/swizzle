@@ -15,7 +15,7 @@ sudo ninja -C build install
 Needs wlroots 0.20, wayland, wayland-protocols, libinput, xkbcommon, libdrm, pixman, and xcb-icccm for XWayland.
 With scenefx 0.5 installed it adds rounded corners and blur and renders with gles only. `-Dscenefx=disabled` leaves it out.
 
-Optional parts, on by default: `xwayland` `layouts` `scratchpad` `sticky` `targets` `lid` `window_share` `portal` `presentation` `effects` `overview`. Off by default: `tablet` `vr`.
+Optional parts, on by default: `xwayland` `layouts` `scratchpad` `sticky` `targets` `tablet` `lid` `window_share` `portal` `presentation` `effects` `overview`. Off by default: `vr`.
 
 ## Use
 
