@@ -23,6 +23,7 @@
 #include <wlr/types/wlr_primary_selection.h>
 #include <wlr/types/wlr_relative_pointer_v1.h>
 #include <wlr/types/wlr_session_lock_v1.h>
+#include <wlr/types/wlr_tablet_v2.h>
 #include <wlr/types/wlr_touch.h>
 #include <wlr/types/wlr_virtual_keyboard_v1.h>
 #include <wlr/types/wlr_virtual_pointer_v1.h>
@@ -1411,8 +1412,16 @@ static void handle_request_cursor(struct wl_listener *l, void *data)
 static void handle_request_shape(struct wl_listener *l, void *data)
 {
 	struct wlr_cursor_shape_manager_v1_request_set_shape_event *ev = data;
-	if (srv.cursor_mode == CURSOR_NORMAL && ev->seat_client == srv.seat->pointer_state.focused_client)
-		wlr_cursor_set_xcursor(srv.cursor, srv.xcursor_mgr, wlr_cursor_shape_v1_name(ev->shape));
+	if (srv.cursor_mode != CURSOR_NORMAL)
+		return;
+	if (ev->device_type == WLR_CURSOR_SHAPE_MANAGER_V1_DEVICE_TYPE_TABLET_TOOL) {
+		struct wlr_surface *f = ev->tablet_tool ? ev->tablet_tool->focused_surface : NULL;
+		if (!f || ev->seat_client->client != wl_resource_get_client(f->resource))
+			return;
+	} else if (ev->seat_client != srv.seat->pointer_state.focused_client) {
+		return;
+	}
+	wlr_cursor_set_xcursor(srv.cursor, srv.xcursor_mgr, wlr_cursor_shape_v1_name(ev->shape));
 }
 
 static void handle_request_selection(struct wl_listener *l, void *data)
