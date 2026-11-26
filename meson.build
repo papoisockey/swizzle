@@ -48,6 +48,7 @@ proto_xml = [
   'protocols/wlr-layer-shell-unstable-v1.xml',
   'protocols/wlr-output-power-management-unstable-v1.xml',
   wl_protocol_dir / 'staging/ext-workspace/ext-workspace-v1.xml',
+  wl_protocol_dir / 'stable/xdg-shell/xdg-shell.xml',
 ]
 
 src = files(

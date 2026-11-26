@@ -13,6 +13,7 @@
 #include <xcb/xcb_icccm.h>
 #endif
 #include "swizzle.h"
+#include "xdg-shell-protocol.h"
 
 struct popup {
 	struct wlr_xdg_popup *popup;

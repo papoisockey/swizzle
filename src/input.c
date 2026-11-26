@@ -202,6 +202,7 @@ void input_map_touch(void)
 		if (m)
 			wlr_cursor_map_input_to_output(srv.cursor, d->dev, m->output);
 	}
+	tablet_map();
 }
 
 static void update_caps(void)
@@ -376,6 +377,9 @@ static void handle_new_input(struct wl_listener *l, void *data)
 		break;
 	case WLR_INPUT_DEVICE_TABLET:
 		tablet_add(dev);
+		break;
+	case WLR_INPUT_DEVICE_TABLET_PAD:
+		tablet_pad_add(dev);
 		break;
 	default:
 		break;
@@ -685,6 +689,7 @@ void input_set_focus_surface(struct wlr_surface *surface)
 		wlr_seat_keyboard_notify_enter(srv.seat, surface, NULL, 0, NULL);
 	input_check_constraint();
 	ime_focus(surface);
+	tablet_focus(surface);
 }
 
 static void handle_constraint_destroy(struct wl_listener *l, void *data)
@@ -872,7 +877,6 @@ void input_motion(uint32_t time, bool warp_only)
 {
 	struct wlr_surface *surf = NULL;
 	double sx = 0, sy = 0;
-	struct client *c;
 
 	wlr_scene_node_set_position(&srv.layers[LYR_DRAG]->node, (int)srv.cursor->x, (int)srv.cursor->y);
 
@@ -922,7 +926,7 @@ void input_motion(uint32_t time, bool warp_only)
 		return;
 	}
 
-	c = hover(time, &surf, &sx, &sy);
+	hover(time, &surf, &sx, &sy);
 	if (!surf && !srv.seat->drag)
 		wlr_cursor_set_xcursor(srv.cursor, srv.xcursor_mgr, "default");
 

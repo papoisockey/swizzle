@@ -532,10 +532,16 @@ struct wlr_input_device;
 void tablet_init(void);
 void tablet_finish(void);
 void tablet_add(struct wlr_input_device *dev);
+void tablet_pad_add(struct wlr_input_device *dev);
+void tablet_focus(struct wlr_surface *surface);
+void tablet_map(void);
 #else
 static inline void tablet_init(void) {}
 static inline void tablet_finish(void) {}
 static inline void tablet_add(struct wlr_input_device *dev) {}
+static inline void tablet_pad_add(struct wlr_input_device *dev) {}
+static inline void tablet_focus(struct wlr_surface *surface) {}
+static inline void tablet_map(void) {}
 #endif
 #ifdef WITH_LID
 void lid_add(struct wlr_input_device *dev);

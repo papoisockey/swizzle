@@ -5,11 +5,30 @@
 #else
 #include <dev/evdev/input-event-codes.h>
 #endif
+#include <libinput.h>
+#include <wlr/backend/libinput.h>
+#include <wlr/types/wlr_tablet_pad.h>
 #include <wlr/types/wlr_tablet_tool.h>
 #include <wlr/types/wlr_tablet_v2.h>
 #include "swizzle.h"
 
+struct tablet {
+	struct wl_list link;
+	struct wlr_input_device *dev;
+	struct wlr_tablet_v2_tablet *v2;
+	struct wl_listener destroy;
+};
+
+struct pad {
+	struct wl_list link;
+	struct wlr_input_device *dev;
+	struct wlr_tablet_v2_tablet_pad *v2;
+	struct wlr_surface *focus;
+	struct wl_listener button, ring, strip, destroy, focus_destroy;
+};
+
 static struct wl_listener tool_axis, tool_proximity, tool_tip, tool_button;
+static struct wl_list tablets, pads;
 static struct wlr_tablet_manager_v2 *tablet_mgr;
 static bool tip_swallowed, tip_down, tip_pointer;
 static uint32_t pointer_buttons[8];
@@ -245,14 +264,160 @@ static void handle_tool_button(struct wl_listener *l, void *data)
 	wlr_seat_pointer_notify_frame(srv.seat);
 }
 
+static struct libinput_device *libinput_of(struct wlr_input_device *dev)
+{
+	return wlr_input_device_is_libinput(dev) ? wlr_libinput_get_device_handle(dev) : NULL;
+}
+
+static struct tablet *pad_tablet(struct pad *p)
+{
+	struct libinput_device *d = libinput_of(p->dev);
+	struct libinput_device_group *group = d ? libinput_device_get_device_group(d) : NULL;
+	struct tablet *t;
+	wl_list_for_each(t, &tablets, link) {
+		struct libinput_device *td = libinput_of(t->dev);
+		if (group && td && libinput_device_get_device_group(td) == group)
+			return t;
+	}
+	return wl_list_empty(&tablets) ? NULL : wl_container_of(tablets.next, t, link);
+}
+
+static void handle_pad_focus_destroy(struct wl_listener *l, void *data)
+{
+	struct pad *p = wl_container_of(l, p, focus_destroy);
+	wl_list_remove(&p->focus_destroy.link);
+	wl_list_init(&p->focus_destroy.link);
+	p->focus = NULL;
+}
+
+static void pad_focus(struct pad *p, struct wlr_surface *surface)
+{
+	if (surface == p->focus)
+		return;
+	if (p->focus)
+		wlr_send_tablet_v2_tablet_pad_leave(p->v2, p->focus);
+	wl_list_remove(&p->focus_destroy.link);
+	wl_list_init(&p->focus_destroy.link);
+	p->focus = NULL;
+	struct tablet *t = surface ? pad_tablet(p) : NULL;
+	if (!t || !wlr_send_tablet_v2_tablet_pad_enter(p->v2, t->v2, surface))
+		return;
+	p->focus = surface;
+	LISTEN(&surface->events.destroy, &p->focus_destroy, handle_pad_focus_destroy);
+}
+
+void tablet_focus(struct wlr_surface *surface)
+{
+	struct pad *p;
+	wl_list_for_each(p, &pads, link)
+		pad_focus(p, surface);
+}
+
+void tablet_map(void)
+{
+	struct tablet *t;
+	wl_list_for_each(t, &tablets, link) {
+		struct libinput_device *d = libinput_of(t->dev);
+		const char *name = d ? libinput_device_get_output_name(d) : NULL;
+		struct monitor *m = name ? output_by_name(name) : NULL;
+		if (m)
+			wlr_cursor_map_input_to_output(srv.cursor, t->dev, m->output);
+	}
+}
+
+static void handle_pad_button(struct wl_listener *l, void *data)
+{
+	struct pad *p = wl_container_of(l, p, button);
+	struct wlr_tablet_pad_button_event *ev = data;
+	input_activity();
+	if (!p->focus)
+		return;
+	wlr_send_tablet_v2_tablet_pad_mode(p->v2, ev->group, ev->mode, ev->time_msec);
+	wlr_send_tablet_v2_tablet_pad_button(p->v2, ev->button, ev->time_msec,
+		ev->state == WLR_BUTTON_PRESSED ? ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED : ZWP_TABLET_PAD_V2_BUTTON_STATE_RELEASED);
+}
+
+static void handle_pad_ring(struct wl_listener *l, void *data)
+{
+	struct pad *p = wl_container_of(l, p, ring);
+	struct wlr_tablet_pad_ring_event *ev = data;
+	input_activity();
+	if (p->focus)
+		wlr_send_tablet_v2_tablet_pad_ring(p->v2, ev->ring, ev->position,
+			ev->source == WLR_TABLET_PAD_RING_SOURCE_FINGER, ev->time_msec);
+}
+
+static void handle_pad_strip(struct wl_listener *l, void *data)
+{
+	struct pad *p = wl_container_of(l, p, strip);
+	struct wlr_tablet_pad_strip_event *ev = data;
+	input_activity();
+	if (p->focus)
+		wlr_send_tablet_v2_tablet_pad_strip(p->v2, ev->strip, ev->position,
+			ev->source == WLR_TABLET_PAD_STRIP_SOURCE_FINGER, ev->time_msec);
+}
+
+static void handle_pad_destroy(struct wl_listener *l, void *data)
+{
+	struct pad *p = wl_container_of(l, p, destroy);
+	wl_list_remove(&p->focus_destroy.link);
+	wl_list_remove(&p->button.link);
+	wl_list_remove(&p->ring.link);
+	wl_list_remove(&p->strip.link);
+	wl_list_remove(&p->destroy.link);
+	wl_list_remove(&p->link);
+	free(p);
+}
+
+void tablet_pad_add(struct wlr_input_device *dev)
+{
+	struct pad *p = calloc(1, sizeof(*p));
+	if (!p)
+		return;
+	p->dev = dev;
+	p->v2 = wlr_tablet_pad_create(tablet_mgr, srv.seat, dev);
+	if (!p->v2) {
+		free(p);
+		return;
+	}
+	struct wlr_tablet_pad *pad = wlr_tablet_pad_from_input_device(dev);
+	wl_list_init(&p->focus_destroy.link);
+	LISTEN(&pad->events.button, &p->button, handle_pad_button);
+	LISTEN(&pad->events.ring, &p->ring, handle_pad_ring);
+	LISTEN(&pad->events.strip, &p->strip, handle_pad_strip);
+	LISTEN(&dev->events.destroy, &p->destroy, handle_pad_destroy);
+	wl_list_insert(&pads, &p->link);
+	pad_focus(p, srv.seat->keyboard_state.focused_surface);
+}
+
+static void handle_tablet_destroy(struct wl_listener *l, void *data)
+{
+	struct tablet *t = wl_container_of(l, t, destroy);
+	wl_list_remove(&t->destroy.link);
+	wl_list_remove(&t->link);
+	free(t);
+}
+
 void tablet_add(struct wlr_input_device *dev)
 {
-	wlr_tablet_from_input_device(dev)->data = wlr_tablet_create(tablet_mgr, srv.seat, dev);
+	struct wlr_tablet_v2_tablet *v2 = wlr_tablet_create(tablet_mgr, srv.seat, dev);
+	wlr_tablet_from_input_device(dev)->data = v2;
 	wlr_cursor_attach_input_device(srv.cursor, dev);
+	struct tablet *t = v2 ? calloc(1, sizeof(*t)) : NULL;
+	if (!t)
+		return;
+	t->dev = dev;
+	t->v2 = v2;
+	LISTEN(&dev->events.destroy, &t->destroy, handle_tablet_destroy);
+	wl_list_insert(tablets.prev, &t->link);
+	tablet_map();
+	tablet_focus(srv.seat->keyboard_state.focused_surface);
 }
 
 void tablet_init(void)
 {
+	wl_list_init(&tablets);
+	wl_list_init(&pads);
 	tablet_mgr = wlr_tablet_v2_create(srv.display);
 	LISTEN(&srv.cursor->events.tablet_tool_axis, &tool_axis, handle_tool_axis);
 	LISTEN(&srv.cursor->events.tablet_tool_proximity, &tool_proximity, handle_tool_proximity);
