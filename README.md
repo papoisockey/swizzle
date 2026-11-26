@@ -2,6 +2,8 @@
 
 Small dynamic tiling Wayland compositor on wlroots 0.20. dwl style tags, thirteen layouts, an overview and a scratchpad, one config file, no bar.
 
+> **Warning:** the code is written entirely by an AI. Every decision about what it does and how it works is made by a person.
+
 ## Build
 
 ```sh

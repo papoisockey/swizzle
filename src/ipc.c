@@ -208,8 +208,6 @@ static bool a_width(const char *arg, char *err, size_t len)
 	arrange(c->mon);
 	return true;
 }
-#else
-#define a_width NULL
 #endif
 
 #ifdef WITH_STICKY
@@ -233,8 +231,6 @@ static bool a_sticky(const char *arg, char *err, size_t len)
 		focus_top(c->mon);
 	return true;
 }
-#else
-#define a_sticky NULL
 #endif
 
 static bool a_gaps(const char *arg, char *err, size_t len)
@@ -355,8 +351,6 @@ static bool a_scratchpad(const char *arg, char *err, size_t len)
 	scratch_set(c, c && !c->scratch);
 	return true;
 }
-#else
-#define a_scratchpad NULL
 #endif
 
 static bool a_toggleview(const char *arg, char *err, size_t len)
@@ -493,8 +487,6 @@ static bool a_overview(const char *arg, char *err, size_t len)
 	}
 	return true;
 }
-#else
-#define a_overview NULL
 #endif
 
 static bool a_toggletag(const char *arg, char *err, size_t len)
@@ -566,8 +558,6 @@ static bool a_mfact(const char *arg, char *err, size_t len)
 
 #ifdef WITH_TARGETS
 static bool a_on(const char *arg, char *err, size_t len);
-#else
-#define a_on NULL
 #endif
 
 static const struct {
@@ -593,12 +583,24 @@ static const struct {
 	{"floating", a_floating, true},
 	{"fullscreen", a_fullscreen, true},
 	{"activate", a_activate, true},
+#ifdef WITH_SCRATCHPAD
 	{"scratchpad", a_scratchpad, true},
+#else
+	{"scratchpad", NULL, true},
+#endif
 	{"nmaster", a_nmaster, false},
 	{"mfact", a_mfact, false},
 	{"layout", a_layout, false},
+#if defined(WITH_SCROLL) || defined(WITH_VERTICAL_SCROLL)
 	{"width", a_width, true},
+#else
+	{"width", NULL, true},
+#endif
+#ifdef WITH_STICKY
 	{"sticky", a_sticky, true},
+#else
+	{"sticky", NULL, true},
+#endif
 	{"gaps", a_gaps, false},
 	{"minimize", a_minimize, true},
 	{"restore", a_restore, true},
@@ -609,8 +611,16 @@ static const struct {
 	{"resize", a_resize, true},
 	{"stack", a_stack, false},
 	{"split", a_split, false},
+#ifdef WITH_OVERVIEW
 	{"overview", a_overview, false},
+#else
+	{"overview", NULL, false},
+#endif
+#ifdef WITH_TARGETS
 	{"on", a_on, false},
+#else
+	{"on", NULL, false},
+#endif
 };
 
 static int find_action(const char *cmd, const char **arg, char *err, size_t errlen)

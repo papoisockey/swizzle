@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,18 @@
 #include "swizzle.h"
 
 static int nerrors, cur_line;
-#define conf_error(...) (nerrors++, wlr_log(WLR_ERROR, __VA_ARGS__))
+
+__attribute__((format(printf, 1, 2)))
+static void conf_error(const char *fmt, ...)
+{
+	char msg[512];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(msg, sizeof(msg), fmt, ap);
+	va_end(ap);
+	nerrors++;
+	wlr_log(WLR_ERROR, "%s", msg);
+}
 
 static double fclamp(double v, double lo, double hi)
 {
@@ -29,7 +41,11 @@ static bool parse_num(const char *v, double lo, double hi, double *out)
 	return true;
 }
 
-#define SET_NUM(dst, v, lo, hi) do { double n_; if (parse_num(v, lo, hi, &n_)) (dst) = n_; } while (0)
+static double num_or(const char *v, double lo, double hi, double old)
+{
+	double n;
+	return parse_num(v, lo, hi, &n) ? n : old;
+}
 
 enum section { SEC_NONE, SEC_GENERAL, SEC_INPUT, SEC_OUTPUT, SEC_RULE, SEC_AUTOSTART, SEC_BIND, SEC_ENV, SEC_TOUCHPAD, SEC_MOUSE,
 	SEC_LAYER };
@@ -66,8 +82,15 @@ static int bool_of(const char *v)
 	return -1;
 }
 
-#define SET_BOOL(dst, v) do { int b_ = bool_of(v); if (b_ < 0) \
-	conf_error("config:%d: expected true or false, got '%s'", cur_line, v); else (dst) = b_; } while (0)
+static int bool_or(const char *v, int old)
+{
+	int b = bool_of(v);
+	if (b < 0) {
+		conf_error("config:%d: expected 1 or 0, got '%s'", cur_line, v);
+		return old;
+	}
+	return b;
+}
 
 static bool parse_color(const char *v, float out[4])
 {
@@ -416,7 +439,7 @@ static bool parse_animation_key(struct config *c, const char *k, const char *v, 
 	if (!strncmp(k, "animation_duration_", 19)) {
 		for (size_t i = 0; i < LENGTH(durs); i++)
 			if (!strcmp(k + 19, durs[i])) {
-				SET_NUM(c->durations[i], v, -1, 5000);
+				c->durations[i] = num_or(v, -1, 5000, c->durations[i]);
 				return true;
 			}
 		return false;
@@ -443,7 +466,7 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 	bool *b = general_bool(c, k);
 	int anim;
 	if (b) {
-		SET_BOOL(*b, v);
+		*b = bool_or(v, *b);
 	} else if (parse_animation_key(c, k, v, line)) {
 	} else if (!strcmp(k, "gaps")) {
 		double g;
@@ -470,17 +493,17 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 		if (!parse_color(v, dst))
 			conf_error("config:%d: invalid color '%s'", line, v);
 	} else if (!strcmp(k, "tag_count")) {
-		SET_NUM(c->tag_count, v, 1, TAGCOUNT);
+		c->tag_count = num_or(v, 1, TAGCOUNT, c->tag_count);
 	} else if (!strcmp(k, "snap_distance")) {
-		SET_NUM(c->snap_distance, v, 0, 500);
+		c->snap_distance = num_or(v, 0, 500, c->snap_distance);
 	} else if (!strcmp(k, "scratchpad_width")) {
-		SET_NUM(c->scratchpad_width, v, 0, 1);
+		c->scratchpad_width = num_or(v, 0, 1, c->scratchpad_width);
 	} else if (!strcmp(k, "scratchpad_height")) {
-		SET_NUM(c->scratchpad_height, v, 0, 1);
+		c->scratchpad_height = num_or(v, 0, 1, c->scratchpad_height);
 	} else if (!strcmp(k, "scroll_width")) {
-		SET_NUM(c->scroll_width, v, 0.1, 1);
+		c->scroll_width = num_or(v, 0.1, 1, c->scroll_width);
 	} else if (!strcmp(k, "scroll_width_single")) {
-		SET_NUM(c->scroll_width_single, v, 0, 1);
+		c->scroll_width_single = num_or(v, 0, 1, c->scroll_width_single);
 	} else if (!strcmp(k, "scroll_presets")) {
 		char buf[256], *save = NULL;
 		int n = 0;
@@ -502,13 +525,13 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 		else
 			conf_error("config:%d: invalid scroll_center '%s', use edge, always or outside", line, v);
 	} else if (!strcmp(k, "scroll_struts")) {
-		SET_NUM(c->scroll_struts, v, 0, 1000);
+		c->scroll_struts = num_or(v, 0, 1000, c->scroll_struts);
 	} else if (!strcmp(k, "overview_gap_inner")) {
-		SET_NUM(c->overview_gap_inner, v, 0, 1000);
+		c->overview_gap_inner = num_or(v, 0, 1000, c->overview_gap_inner);
 	} else if (!strcmp(k, "overview_gap_outer")) {
-		SET_NUM(c->overview_gap_outer, v, 0, 1000);
+		c->overview_gap_outer = num_or(v, 0, 1000, c->overview_gap_outer);
 	} else if (!strcmp(k, "hotarea_size")) {
-		SET_NUM(c->hotarea_size, v, 0, 1000);
+		c->hotarea_size = num_or(v, 0, 1000, c->hotarea_size);
 	} else if (!strcmp(k, "hotarea_corner")) {
 		static const char *corners[] = {"top-left", "top-right", "bottom-left", "bottom-right"};
 		size_t i = 0;
@@ -519,18 +542,18 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 		else
 			conf_error("config:%d: invalid hotarea_corner '%s'", line, v);
 	} else if (!strcmp(k, "axis_timeout")) {
-		SET_NUM(c->axis_timeout, v, 0, 1000);
+		c->axis_timeout = num_or(v, 0, 1000, c->axis_timeout);
 	} else if (!strcmp(k, "animation_open") || !strcmp(k, "animation_close")) {
 		if ((anim = parse_anim(v, line)) >= 0)
 			*(k[10] == 'o' ? &c->anim_open : &c->anim_close) = (enum anim_kind)anim;
 	} else if (!strcmp(k, "fade_in_opacity")) {
-		SET_NUM(c->fade_in_opacity, v, 0, 1);
+		c->fade_in_opacity = num_or(v, 0, 1, c->fade_in_opacity);
 	} else if (!strcmp(k, "fade_out_opacity")) {
-		SET_NUM(c->fade_out_opacity, v, 0, 1);
+		c->fade_out_opacity = num_or(v, 0, 1, c->fade_out_opacity);
 	} else if (!strcmp(k, "zoom_start")) {
-		SET_NUM(c->zoom_start, v, 0.05, 1);
+		c->zoom_start = num_or(v, 0.05, 1, c->zoom_start);
 	} else if (!strcmp(k, "zoom_end")) {
-		SET_NUM(c->zoom_end, v, 0.05, 1);
+		c->zoom_end = num_or(v, 0.05, 1, c->zoom_end);
 	} else if (!strcmp(k, "tag_animation")) {
 		static const char *names[] = {"fade", "slide", "slide_vertical", "none"};
 		size_t i = 0;
@@ -541,19 +564,19 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 		else
 			conf_error("config:%d: invalid tag_animation '%s', use fade, slide, slide_vertical or none", line, v);
 	} else if (!strcmp(k, "opacity_focused")) {
-		SET_NUM(c->opacity_focused, v, 0.05, 1);
+		c->opacity_focused = num_or(v, 0.05, 1, c->opacity_focused);
 	} else if (!strcmp(k, "opacity_unfocused")) {
-		SET_NUM(c->opacity_unfocused, v, 0.05, 1);
+		c->opacity_unfocused = num_or(v, 0.05, 1, c->opacity_unfocused);
 	} else if (!strcmp(k, "shadow_blur")) {
-		SET_NUM(c->shadow_blur, v, 0, 100);
+		c->shadow_blur = num_or(v, 0, 100, c->shadow_blur);
 	} else if (!strcmp(k, "blur_noise")) {
-		SET_NUM(c->blur_noise, v, 0, 1);
+		c->blur_noise = num_or(v, 0, 1, c->blur_noise);
 	} else if (!strcmp(k, "blur_brightness")) {
-		SET_NUM(c->blur_brightness, v, 0, 2);
+		c->blur_brightness = num_or(v, 0, 2, c->blur_brightness);
 	} else if (!strcmp(k, "blur_contrast")) {
-		SET_NUM(c->blur_contrast, v, 0, 2);
+		c->blur_contrast = num_or(v, 0, 2, c->blur_contrast);
 	} else if (!strcmp(k, "blur_saturation")) {
-		SET_NUM(c->blur_saturation, v, 0, 2);
+		c->blur_saturation = num_or(v, 0, 2, c->blur_saturation);
 	} else if (!strcmp(k, "attach")) {
 		if (!strcmp(v, "top"))
 			c->attach = ATTACH_TOP;
@@ -577,9 +600,9 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 		else
 			conf_error("config:%d: invalid renderer '%s', use auto, vulkan, gles or pixman", line, v);
 	} else if (!strcmp(k, "border_width")) {
-		SET_NUM(c->border_width, v, 0, 100);
+		c->border_width = num_or(v, 0, 100, c->border_width);
 	} else if (!strcmp(k, "border_outer_width")) {
-		SET_NUM(c->border_outer_width, v, 0, 100);
+		c->border_outer_width = num_or(v, 0, 100, c->border_outer_width);
 	} else if (!strcmp(k, "border_outer")) {
 		if (!parse_color(v, c->border_outer))
 			conf_error("config:%d: invalid color '%s'", line, v);
@@ -588,9 +611,9 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 		if (!parse_color(v, dst))
 			conf_error("config:%d: invalid color '%s'", line, v);
 	} else if (!strcmp(k, "mfact")) {
-		SET_NUM(c->mfact, v, 0.05, 0.95);
+		c->mfact = num_or(v, 0.05, 0.95, c->mfact);
 	} else if (!strcmp(k, "nmaster")) {
-		SET_NUM(c->nmaster, v, 0, 100);
+		c->nmaster = num_or(v, 0, 100, c->nmaster);
 	} else if (!strcmp(k, "mouse_mod")) {
 		uint32_t m = parse_mod(v);
 		if (m)
@@ -601,20 +624,20 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 		free(c->cursor_theme);
 		c->cursor_theme = *v ? strdup(v) : NULL;
 	} else if (!strcmp(k, "cursor_size")) {
-		SET_NUM(c->cursor_size, v, 8, 256);
+		c->cursor_size = num_or(v, 8, 256, c->cursor_size);
 	} else if (!strcmp(k, "animation_duration")) {
-		SET_NUM(c->animation_duration, v, 0, 2000);
+		c->animation_duration = num_or(v, 0, 2000, c->animation_duration);
 	} else if (!strcmp(k, "shadow_size")) {
-		SET_NUM(c->shadow_size, v, 0, 100);
+		c->shadow_size = num_or(v, 0, 100, c->shadow_size);
 	} else if (!strcmp(k, "shadow_color")) {
 		if (!parse_color(v, c->shadow_color))
 			conf_error("config:%d: invalid color '%s'", line, v);
 	} else if (!strcmp(k, "corner_radius")) {
-		SET_NUM(c->corner_radius, v, 0, 100);
+		c->corner_radius = num_or(v, 0, 100, c->corner_radius);
 	} else if (!strcmp(k, "blur_passes")) {
-		SET_NUM(c->blur_passes, v, 0, 10);
+		c->blur_passes = num_or(v, 0, 10, c->blur_passes);
 	} else if (!strcmp(k, "blur_radius")) {
-		SET_NUM(c->blur_radius, v, 1, 64);
+		c->blur_radius = num_or(v, 1, 64, c->blur_radius);
 	} else {
 		conf_error("config:%d: unknown key '%s' in [general]", line, k);
 	}
@@ -623,21 +646,21 @@ static void parse_general(struct config *c, const char *k, const char *v, int li
 static bool parse_pointer(struct pointer_conf *p, const char *k, const char *v, int line)
 {
 	if (!strcmp(k, "tap")) {
-		SET_BOOL(p->tap, v);
+		p->tap = bool_or(v, p->tap);
 	} else if (!strcmp(k, "tap_drag")) {
-		SET_BOOL(p->tap_drag, v);
+		p->tap_drag = bool_or(v, p->tap_drag);
 	} else if (!strcmp(k, "dwt")) {
-		SET_BOOL(p->dwt, v);
+		p->dwt = bool_or(v, p->dwt);
 	} else if (!strcmp(k, "natural_scroll")) {
-		SET_BOOL(p->natural_scroll, v);
+		p->natural_scroll = bool_or(v, p->natural_scroll);
 	} else if (!strcmp(k, "left_handed")) {
-		SET_BOOL(p->left_handed, v);
+		p->left_handed = bool_or(v, p->left_handed);
 	} else if (!strcmp(k, "middle_emulation")) {
-		SET_BOOL(p->middle_emulation, v);
+		p->middle_emulation = bool_or(v, p->middle_emulation);
 	} else if (!strcmp(k, "drag_lock")) {
-		SET_BOOL(p->drag_lock, v);
+		p->drag_lock = bool_or(v, p->drag_lock);
 	} else if (!strcmp(k, "enabled")) {
-		SET_BOOL(p->enabled, v);
+		p->enabled = bool_or(v, p->enabled);
 	} else if (!strcmp(k, "accel")) {
 		double a;
 		if (parse_num(v, -1.0, 1.0, &a))
@@ -689,15 +712,15 @@ static void parse_input(struct config *c, const char *k, const char *v, int line
 	if (str)
 		set_str(str, v);
 	else if (!strcmp(k, "repeat_rate")) {
-		SET_NUM(c->repeat_rate, v, 0, 1000);
+		c->repeat_rate = num_or(v, 0, 1000, c->repeat_rate);
 	} else if (!strcmp(k, "repeat_delay")) {
-		SET_NUM(c->repeat_delay, v, 0, 10000);
+		c->repeat_delay = num_or(v, 0, 10000, c->repeat_delay);
 	} else if (!strcmp(k, "gesture_fingers")) {
-		SET_NUM(c->gesture_fingers, v, 0, 5);
+		c->gesture_fingers = num_or(v, 0, 5, c->gesture_fingers);
 	} else if (!strcmp(k, "swipe_threshold")) {
-		SET_NUM(c->swipe_threshold, v, 1, 2000);
+		c->swipe_threshold = num_or(v, 1, 2000, c->swipe_threshold);
 	} else if (!strcmp(k, "numlock")) {
-		SET_BOOL(c->numlock, v);
+		c->numlock = bool_or(v, c->numlock);
 	} else if (!parse_pointer(&c->pointer, k, v, line)) {
 		conf_error("config:%d: unknown key '%s' in [input]", line, k);
 	}
@@ -765,18 +788,18 @@ static void parse_output(struct output_conf *o, const char *k, const char *v, in
 		if (o->layout < 0)
 			conf_error("config:%d: invalid layout '%s'", line, v);
 	} else if (!strcmp(k, "tearing")) {
-		SET_BOOL(o->tearing, v);
+		o->tearing = bool_or(v, o->tearing);
 	} else if (!strcmp(k, "enabled")) {
-		SET_BOOL(o->enabled, v);
+		o->enabled = bool_or(v, o->enabled);
 	} else if (!strcmp(k, "direct_scanout")) {
-		SET_BOOL(o->direct_scanout, v);
+		o->direct_scanout = bool_or(v, o->direct_scanout);
 	} else if (!strcmp(k, "hardware_cursor")) {
 		if (!strcmp(v, "auto"))
 			o->hardware_cursor = 2;
 		else
-			SET_BOOL(o->hardware_cursor, v);
+			o->hardware_cursor = bool_or(v, o->hardware_cursor);
 	} else if (!strcmp(k, "primary")) {
-		SET_BOOL(o->primary, v);
+		o->primary = bool_or(v, o->primary);
 	} else if (!strcmp(k, "tag_layouts")) {
 		for (int i = 0; i < TAGCOUNT; i++) {
 			size_t n = strcspn(v, ",");
@@ -802,23 +825,23 @@ static void parse_rule(struct rule *r, const char *k, const char *v, int line)
 	} else if (!strcmp(k, "title")) {
 		set_str(&r->title, v);
 	} else if (!strcmp(k, "floating")) {
-		SET_BOOL(r->floating, v);
+		r->floating = bool_or(v, r->floating);
 	} else if (!strcmp(k, "tags")) {
 		r->tags = parse_tags(v);
 	} else if (!strcmp(k, "output")) {
 		set_str(&r->output, v);
 	} else if (!strcmp(k, "fullscreen")) {
-		SET_BOOL(r->fullscreen, v);
+		r->fullscreen = bool_or(v, r->fullscreen);
 #ifdef WITH_SCRATCHPAD
 	} else if (!strcmp(k, "scratchpad")) {
-		SET_BOOL(r->scratchpad, v);
+		r->scratchpad = bool_or(v, r->scratchpad);
 #endif
 #ifdef WITH_STICKY
 	} else if (!strcmp(k, "sticky")) {
-		SET_BOOL(r->sticky, v);
+		r->sticky = bool_or(v, r->sticky);
 #endif
 	} else if (!strcmp(k, "focus")) {
-		SET_BOOL(r->focus, v);
+		r->focus = bool_or(v, r->focus);
 	} else {
 		conf_error("config:%d: unknown key '%s' in [rule]", line, k);
 	}
@@ -830,11 +853,11 @@ static void parse_layer_rule(struct layer_rule *r, const char *k, const char *v,
 	if (!strcmp(k, "namespace"))
 		set_str(&r->namespace, v);
 	else if (!strcmp(k, "animations"))
-		SET_BOOL(r->animations, v);
+		r->animations = bool_or(v, r->animations);
 	else if (!strcmp(k, "blur"))
-		SET_BOOL(r->blur, v);
+		r->blur = bool_or(v, r->blur);
 	else if (!strcmp(k, "shadow"))
-		SET_BOOL(r->shadow, v);
+		r->shadow = bool_or(v, r->shadow);
 	else if (!strcmp(k, "animation_open") && (a = parse_anim(v, line)) >= 0)
 		r->anim_open = a;
 	else if (!strcmp(k, "animation_close") && (a = parse_anim(v, line)) >= 0)
