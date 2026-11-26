@@ -439,6 +439,7 @@ static void scale_color(float out[4], const float in[4], float a)
 static void set_opacity(struct effects *fx, float a)
 {
 	float col[4];
+	a = MAX(0.0f, MIN(1.0f, a));
 	wlr_scene_node_for_each_buffer(&tree_of(fx)->node, buffer_opacity, &a);
 	struct client *c = fx->c;
 	for (size_t i = 0; c && i < LENGTH(c->border) && c->border[i]; i++) {
@@ -574,6 +575,7 @@ static void snapshot_apply(struct snapshot *s, float e, float ea)
 {
 	float sc = s->scale_from + (s->scale_to - s->scale_from) * e, a = s->alpha_from + (s->alpha_to - s->alpha_from) * ea;
 	float col[4];
+	a = MAX(0.0f, MIN(1.0f, a));
 	if (s->owner) {
 		struct wlr_scene_node *t = &tree_of(s->owner)->node;
 		wlr_scene_node_set_position(&s->tree->node, t->x, t->y);
